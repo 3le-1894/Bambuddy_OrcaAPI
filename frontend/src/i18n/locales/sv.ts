@@ -3590,6 +3590,7 @@ errors: {
       tokenWarning: 'Denna URL innehåller en token — vem som helst som kan läsa den kan titta på strömmen och se filnamnet. Återkalla token för att blockera den.',
       fields: 'Fält att visa',
       fieldPrinter: 'Skrivarnamn',
+      fieldModel: 'Skrivarmodell',
       fieldFilename: 'Filnamn',
       fieldStatus: 'Status',
       fieldProgress: 'Förloppsindikator',
