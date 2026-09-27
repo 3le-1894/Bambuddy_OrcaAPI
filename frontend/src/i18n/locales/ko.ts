@@ -2799,6 +2799,9 @@ export default {
     updateEnergyCost: '전기 요금 업데이트',
     updateEnergyCostDescription: '이 키가 /settings/electricity-price에 새 kWh당 전기 요금을 POST할 수 있도록 허용합니다. Home Assistant 동적 요금 자동화(Tibber, Octopus 등)에 유용합니다. API 키로 쓸 수 있는 유일한 설정 필드입니다.',
     energyCostBadge: '에너지',
+    sendNotifications: '알림 보내기',
+    sendNotificationsDescription: '이 키가 연결된 앱의 메시지를 받는 알림 채널을 통해 메시지를 보낼 수 있도록 허용합니다(POST /notifications/app-message). Bambuddy Orders 같은 앱용입니다. 그 외에는 없으며, 키로 채널을 읽거나 변경할 수 없습니다.',
+    sendNotificationsBadge: '알림',
     passwordRequirements: '최소 8자, 대문자, 소문자, 숫자, 특수문자 각 1개 이상 포함',
 
     pipelineLimits: {
@@ -5967,6 +5970,10 @@ export default {
     bedCooledDescription: '인쇄 후 베드가 임계값 이하로 냉각됨',
     firstLayerCompleteLabel: '첫 번째 레이어 완료',
     firstLayerCompleteDescription: '첫 번째 레이어 완료 시 스냅샷과 함께 알림',
+    connectedApps: '연결된 앱',
+    appMessages: '연결된 앱의 메시지',
+    appMessagesDescription: '다른 애플리케이션이 Bambuddy를 통해 보내는 메시지를 전달합니다(예: Bambuddy Orders)',
+    appMessagesBadge: '앱',
     missingSpoolAssignmentLabel: '스풀 할당 누락',
     billingChargeFailedLabel: '결제 처리 실패',
     billingChargeFailedDescription: '인쇄 비용을 기록하지 못한 경우 알림',

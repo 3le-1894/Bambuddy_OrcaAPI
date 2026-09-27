@@ -54,6 +54,7 @@ export function AddNotificationModal({ provider, onClose }: AddNotificationModal
     provider?.on_location_ha_sensor_alert ?? false
   );
   const [onFirstLayerComplete, setOnFirstLayerComplete] = useState(provider?.on_first_layer_complete ?? false);
+  const [onAppMessage, setOnAppMessage] = useState(provider?.on_app_message ?? false);
 
   // Provider-specific config (scalar fields only — event_priorities is split out
   // into its own state because it's an object, not a string).
@@ -213,6 +214,7 @@ export function AddNotificationModal({ provider, onClose }: AddNotificationModal
       on_ha_sensor_alert: onHaSensorAlert,
       on_location_ha_sensor_alert: onLocationHaSensorAlert,
       on_first_layer_complete: onFirstLayerComplete,
+      on_app_message: onAppMessage,
     };
 
     if (isEditing) {
@@ -712,6 +714,18 @@ export function AddNotificationModal({ provider, onClose }: AddNotificationModal
                   </div>
                   <Toggle checked={onStockBreakAlert} onChange={setOnStockBreakAlert} />
                 </div>
+              </div>
+            </div>
+
+            {/* Messages other applications send (POST /notifications/app-message) */}
+            <div className="space-y-2 p-3 bg-bambu-dark rounded-lg">
+              <p className="text-xs text-bambu-gray uppercase tracking-wide mb-2">{t('notifications.connectedApps')}</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm text-white">{t('notifications.appMessages')}</span>
+                  <span className="text-xs text-bambu-gray ml-1">{t('notifications.appMessagesDescription')}</span>
+                </div>
+                <Toggle checked={onAppMessage} onChange={setOnAppMessage} />
               </div>
             </div>
 

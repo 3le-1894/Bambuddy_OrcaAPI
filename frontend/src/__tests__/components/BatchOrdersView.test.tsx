@@ -290,3 +290,27 @@ describe('BatchOrdersView (#342)', () => {
     expect(screen.getByRole('button', { name: 'queue.cancelBatch' })).toBeInTheDocument();
   });
 });
+
+describe('BatchOrdersView linked to one batch (/queue?batch=<id>)', () => {
+  it('shows every status and highlights the linked batch', async () => {
+    let statusAsked: string | null = 'unset';
+    server.use(
+      http.get('/api/v1/queue/batches', ({ request }) => {
+        statusAsked = new URL(request.url).searchParams.get('status');
+        return HttpResponse.json([
+          batch({ id: 7, name: '#1001 PS-BLK', status: 'completed' }),
+          batch({ id: 8, name: '#1002 CS-4' }),
+        ]);
+      }),
+    );
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    render(<BatchOrdersView hasPermission={allow} t={passthroughT} focusBatchId={7} />);
+
+    await screen.findByText('#1001 PS-BLK');
+    expect(statusAsked).toBeNull(); // "all": a finished batch still shows
+    expect(document.getElementById('batch-7')).toHaveClass('ring-2');
+    expect(document.getElementById('batch-8')).not.toHaveClass('ring-2');
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
+  });
+});

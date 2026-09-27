@@ -5095,6 +5095,24 @@ async def run_migrations(conn):
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_print_batches_external ON print_batches (external_source, external_ref)",
     )
 
+    # Migration: messages from other applications through the notification
+    # channels. Both flags default off, so no channel starts delivering them and
+    # no existing API key gains the right to send them on upgrade. BOOLEAN
+    # DEFAULT FALSE is accepted by SQLite and PostgreSQL alike. The backfill
+    # covers a table create_all() already gave the column (the ALTER is then
+    # swallowed as a duplicate and existing rows keep NULL; see the stock alert
+    # flags above).
+    await _safe_execute(conn, "ALTER TABLE notification_providers ADD COLUMN on_app_message BOOLEAN DEFAULT FALSE")
+    await _safe_execute(conn, "ALTER TABLE api_keys ADD COLUMN can_send_notifications BOOLEAN DEFAULT FALSE")
+    async with conn.begin_nested():
+        await conn.execute(
+            text("UPDATE notification_providers SET on_app_message = :off WHERE on_app_message IS NULL"), {"off": False}
+        )
+        await conn.execute(
+            text("UPDATE api_keys SET can_send_notifications = :off WHERE can_send_notifications IS NULL"),
+            {"off": False},
+        )
+
 
 async def _migrate_confirm_prompt_body_template(conn) -> None:
     """Replace the one-tap verdict URLs in the outcome prompt's body (#1898).

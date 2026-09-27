@@ -299,6 +299,7 @@ export function SettingsPage() {
     can_manage_projects: true,
     can_access_cloud: false,
     can_update_energy_cost: false,
+    can_send_notifications: false,
   });
   const [createdAPIKey, setCreatedAPIKey] = useState<string | null>(null);
   const [showApiKeyQR, setShowApiKeyQR] = useState(false);
@@ -4634,6 +4635,18 @@ export function SettingsPage() {
                           <p className="text-xs text-bambu-gray">{t('settings.updateEnergyCostDescription')}</p>
                         </div>
                       </label>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newAPIKeyPermissions.can_send_notifications}
+                          onChange={(e) => setNewAPIKeyPermissions(prev => ({ ...prev, can_send_notifications: e.target.checked }))}
+                          className="w-4 h-4 text-bambu-green rounded border-bambu-dark-tertiary bg-bambu-dark focus:ring-bambu-green"
+                        />
+                        <div>
+                          <span className="text-white">{t('settings.sendNotifications')}</span>
+                          <p className="text-xs text-bambu-gray">{t('settings.sendNotificationsDescription')}</p>
+                        </div>
+                      </label>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 pt-2">
@@ -4711,6 +4724,9 @@ export function SettingsPage() {
                             )}
                             {key.can_update_energy_cost && (
                               <span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded">{t('settings.energyCostBadge')}</span>
+                            )}
+                            {key.can_send_notifications && (
+                              <span className="px-1.5 py-0.5 bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400 rounded">{t('settings.sendNotificationsBadge')}</span>
                             )}
                             {key.user_id === null && (
                               <span

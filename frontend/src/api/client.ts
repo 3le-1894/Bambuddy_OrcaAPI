@@ -1294,6 +1294,7 @@ export interface APIKey {
   can_manage_projects: boolean;
   can_access_cloud: boolean;
   can_update_energy_cost: boolean;
+  can_send_notifications: boolean;
   printer_ids: number[] | null;
   enabled: boolean;
   last_used: string | null;
@@ -1313,6 +1314,7 @@ export interface APIKeyCreate {
   can_manage_projects?: boolean;
   can_access_cloud?: boolean;
   can_update_energy_cost?: boolean;
+  can_send_notifications?: boolean;
   printer_ids?: number[] | null;
   expires_at?: string | null;
 }
@@ -1333,6 +1335,7 @@ export interface APIKeyUpdate {
   can_manage_projects?: boolean;
   can_access_cloud?: boolean;
   can_update_energy_cost?: boolean;
+  can_send_notifications?: boolean;
   printer_ids?: number[] | null;
   enabled?: boolean;
   expires_at?: string | null;
@@ -3019,6 +3022,7 @@ export interface NotificationProvider {
   on_location_ha_sensor_alert: boolean;
   // First layer complete
   on_first_layer_complete: boolean;
+  on_app_message: boolean;
   // Inventory stock alerts
   on_stock_reorder_alert: boolean;
   on_stock_break_alert: boolean;
@@ -3085,6 +3089,7 @@ export interface NotificationProviderCreate {
   on_location_ha_sensor_alert?: boolean;
   // First layer complete
   on_first_layer_complete?: boolean;
+  on_app_message?: boolean;
   // Inventory stock alerts
   on_stock_reorder_alert?: boolean;
   on_stock_break_alert?: boolean;
@@ -3144,6 +3149,7 @@ export interface NotificationProviderUpdate {
   on_location_ha_sensor_alert?: boolean;
   // First layer complete
   on_first_layer_complete?: boolean;
+  on_app_message?: boolean;
   // Inventory stock alerts
   on_stock_reorder_alert?: boolean;
   on_stock_break_alert?: boolean;
