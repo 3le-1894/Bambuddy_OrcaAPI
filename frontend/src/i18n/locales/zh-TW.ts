@@ -682,6 +682,8 @@ export default {
       hours: '小時',
       timeRemaining: '剩餘 {{time}}',
       active: '乾燥中',
+      notRunning: '乾燥未在進行',
+      notRunningHint: '印表機設有乾燥計時器，但倒數已停止，且 AMS 未回報任何乾燥階段。該週期從未啟動，或因功率限制、目前的列印等原因被暫停。',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: '不支援乾燥',
       powerRequired: '連線AMS電源介面卡以啟用乾燥',

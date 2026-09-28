@@ -685,6 +685,8 @@ export default {
       hours: 'hours',
       timeRemaining: '{{time}} left',
       active: 'Drying',
+      notRunning: 'Drying not running',
+      notRunningHint: 'The printer holds a drying timer, but the countdown has stopped and the AMS reports no drying phase. The cycle never started or was paused, for example by the power limit or the current print.',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: 'Drying not supported',
       powerRequired: 'Connect AMS power adapter to enable drying',

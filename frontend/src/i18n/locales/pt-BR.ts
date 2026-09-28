@@ -682,6 +682,8 @@ export default {
       hours: 'horas',
       timeRemaining: '{{time}} restante',
       active: 'Secagem',
+      notRunning: 'Secagem não está em andamento',
+      notRunningHint: 'A impressora tem um temporizador de secagem, mas a contagem regressiva parou e o AMS não informa nenhuma fase de secagem. O ciclo nunca começou ou foi pausado, por exemplo pelo limite de energia ou pela impressão em andamento.',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: 'Secagem não suportada',
       powerRequired: 'Conecte o adaptador de energia AMS para ativar a secagem',

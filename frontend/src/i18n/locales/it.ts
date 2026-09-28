@@ -682,6 +682,8 @@ export default {
       hours: 'ore',
       timeRemaining: '{{time}} rimanente',
       active: 'Essiccazione',
+      notRunning: 'Essiccazione non in corso',
+      notRunningHint: 'La stampante ha un timer di essiccazione, ma il conto alla rovescia è fermo e l\'AMS non segnala alcuna fase di essiccazione. Il ciclo non è mai partito o è stato messo in pausa, ad esempio dal limite di potenza o dalla stampa in corso.',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: 'Essiccazione non supportata',
       powerRequired: 'Collegare l\'alimentatore AMS per abilitare l\'asciugatura',

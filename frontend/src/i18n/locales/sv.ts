@@ -685,6 +685,8 @@ export default {
       hours: 'timmar',
       timeRemaining: '{{time}} kvar',
       active: 'Torkar',
+      notRunning: 'Torkningen pågår inte',
+      notRunningHint: 'Skrivaren har en torkningstimer, men nedräkningen har stannat och AMS rapporterar ingen torkningsfas. Cykeln startade aldrig eller pausades, till exempel av effektgränsen eller den pågående utskriften.',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: 'Torkning stöds inte',
       powerRequired: 'Anslut AMS-strömadapter för att aktivera torkning',

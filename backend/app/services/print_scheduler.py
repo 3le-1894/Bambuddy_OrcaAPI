@@ -59,6 +59,7 @@ from backend.app.services.printer_manager import (
     supports_drying_while_printing,
 )
 from backend.app.services.smart_plug_manager import smart_plug_manager
+from backend.app.utils.ams_drying import is_countdown_parked
 from backend.app.utils.ams_humidity import ams_humidity_percent
 from backend.app.utils.archive_paths import archive_photos_dir
 from backend.app.utils.color_utils import perceptual_color_distance
@@ -1641,8 +1642,12 @@ class PrintScheduler:
                     # Drying blocks the queue, if the user asked it to. A hold
                     # is a skip like any other, so it belongs here with the
                     # rest of the availability checks.
-                    if self._drying_in_progress.get(item.printer_id) and await self._get_bool_setting(
-                        db, "queue_drying_block"
+                    # A parked timer (#2896) never ends, so it must not hold the
+                    # queue; it stays tracked so the stop paths still reach it.
+                    if (
+                        self._drying_in_progress.get(item.printer_id)
+                        and not self._drying_is_only_parked(item.printer_id)
+                        and await self._get_bool_setting(db, "queue_drying_block")
                     ):
                         # Busy-shaped on purpose: the cycle ends on its own and
                         # the job goes out, so there is nothing to alert about.
@@ -4717,6 +4722,26 @@ class PrintScheduler:
         for key in [k for k in self._auto_dry_above if printer_manager.get_status(k[0]) is None]:
             self._auto_dry_above.pop(key, None)
 
+    @staticmethod
+    def _drying_is_only_parked(printer_id: int) -> bool:
+        """True when every AMS unit with a drying timer on this printer is parked.
+
+        A parked timer (#2896: the command was taken but the countdown never
+        runs) does not end on its own, so nothing may wait on it. False when no
+        unit reports a timer yet -- a command just sent that the firmware has not
+        reported back is real drying about to begin.
+        """
+        state = printer_manager.get_status(printer_id)
+        units = [a for a in ((state.raw_data or {}).get("ams") or [] if state else []) if isinstance(a, dict)]
+        timed = []
+        for unit in units:
+            try:
+                if int(unit.get("dry_time") or 0) > 0:
+                    timed.append(unit)
+            except (TypeError, ValueError):
+                continue
+        return bool(timed) and all(is_countdown_parked(unit) for unit in timed)
+
     async def _drying_may_continue_through_print(self, db: AsyncSession, printer_id: int) -> bool:
         """True when a running cycle can be left alone while the next print runs.
 
@@ -4850,7 +4875,9 @@ class PrintScheduler:
                 logger.warning("Scheduled drying %d: %s", row.id, unsupported)
                 continue
 
-            if self._drying_in_progress.get(row.printer_id) or row.printer_id in running_printer_ids:
+            if (
+                self._drying_in_progress.get(row.printer_id) and not self._drying_is_only_parked(row.printer_id)
+            ) or row.printer_id in running_printer_ids:
                 row.waiting_reason = "already_drying"
                 continue
             if not self._is_printer_idle(row.printer_id, require_plate_clear=False):
@@ -4942,6 +4969,33 @@ class PrintScheduler:
             dry_time = int(target.get("dry_time") or 0) if target else 0
         except (TypeError, ValueError):
             dry_time = 0
+        if dry_time > 0 and is_countdown_parked(target):
+            # The printer took the command but the countdown is not running
+            # (#2896) and will never reach 0, so the run would stay "running"
+            # forever. A print in progress is the likely cause (the power budget
+            # is spent), so re-queue it like any interruption; the next start
+            # waits for the printer to be idle. Parked on an idle printer is a
+            # refusal, not something a retry fixes. The timer itself is left on
+            # the printer: it may yet start once power frees up.
+            if not self._is_printer_idle(row.printer_id, require_plate_clear=False):
+                logger.info(
+                    "Scheduled drying %d: AMS %d countdown is not running during a print; re-queued",
+                    row.id,
+                    row.ams_id,
+                )
+                row.status = "pending"
+                row.started_at = None
+                row.waiting_reason = "interrupted"
+            else:
+                logger.warning(
+                    "Scheduled drying %d: printer accepted the command but AMS %d never started drying",
+                    row.id,
+                    row.ams_id,
+                )
+                row.status = "failed"
+                row.error_message = "The printer accepted the drying command, but the AMS did not start drying"
+                row.completed_at = now
+            return
         if dry_time > 0:
             return
 
