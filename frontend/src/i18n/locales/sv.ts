@@ -5072,7 +5072,6 @@ errors: {
     spoolmanFilamentUnlinked: 'Filamentkataloglänk rensad',
     noSpoolmanFilaments: 'Inga filament hittade i Spoolman-katalog',
     spoolmanFilamentColorSwatch: 'Filamentfärg',
-    spoolWeightManagedBySpoolman: 'Tom rullvikt hanteras per filamenttyp i Spoolman',
     spoolmanCatalogLoadFailed: 'Kunde inte ladda Spoolman filamentkatalog',
   },
 

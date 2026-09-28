@@ -5069,7 +5069,6 @@ export default {
     spoolmanFilamentUnlinked: "Посилання на каталог філаментів видалено",
     noSpoolmanFilaments: "У каталозі Spoolman не знайдено філаментів",
     spoolmanFilamentColorSwatch: "Колір філаменту",
-    spoolWeightManagedBySpoolman: "Вага порожньої котушки керується залежно від типу філаменту в Spoolman",
     spoolmanCatalogLoadFailed: "Не вдалося завантажити каталог філаментів Spoolman",
   },
 
