@@ -5484,17 +5484,18 @@ class TestHMSFullCode:
         assert len(mqtt_client.state.hms_errors) == 1
         assert mqtt_client.state.hms_errors[0].description is None
 
-    def test_hms_array_path_resolves_via_the_short_key(self, mqtt_client):
-        """`hms[]` faults resolve through the G1_G4 collapse — the same lookup
-        the notification path and the frontend modal have always used. 0500_4038
-        is the nozzle-size mismatch behind #1111 and it arrives in this shape."""
-        mqtt_client._update_state({"hms": [{"attr": 0x05000000, "code": 0x00004038}]})
+    def test_hms_array_path_resolves_by_the_full_code(self, mqtt_client):
+        """A real P2S fault from #2728, verbatim from the report topic. It resolves
+        through its full 16-char code, which is how Bambu Studio keys its HMS
+        texts, and says what the reporter found: a module/firmware mismatch."""
+        mqtt_client._update_state({"hms": [{"attr": 83886848, "code": 131086}]})
         assert len(mqtt_client.state.hms_errors) == 1
-        assert "nozzle diameter" in (mqtt_client.state.hms_errors[0].description or "")
+        error = mqtt_client.state.hms_errors[0]
+        assert error.full_code == "050003000002000E"
+        assert error.description.startswith("Some modules are incompatible with the printer's firmware version")
 
-    def test_hms_array_leaves_description_none_when_uncatalogued(self, mqtt_client):
-        """A real P2S fault (#2728) whose collapse is "0500_000A" — not a
-        catalogue key, since none has an error group below 0x4000. The fault is
+    def test_hms_array_leaves_description_none_when_bambu_publishes_no_text(self, mqtt_client):
+        """A real P2S fault (#2728) that Bambu lists with empty text. The fault is
         still reported; only the text is absent."""
         mqtt_client._update_state({"hms": [{"attr": 0x05000200, "code": 0x0003000A}]})
         assert len(mqtt_client.state.hms_errors) == 1
