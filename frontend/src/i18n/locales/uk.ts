@@ -716,6 +716,7 @@ export default {
       waitingInterrupted: "Перервано, відновиться, коли принтер звільниться",
       scheduleFailedReason: "Не вдалося виконати заплановане сушіння: {{reason}}",
       scheduleFailedUnknown: "Невідома помилка",
+      scheduleFailedDidNotStart: "Принтер прийняв команду, але AMS не розпочав сушіння",
       dismissFailed: "Сховати",
     },
     // AMS Filament Backup status badge (printer-wide auto-switch to another spool)

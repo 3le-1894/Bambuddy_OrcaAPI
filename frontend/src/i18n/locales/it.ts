@@ -713,6 +713,7 @@ export default {
       waitingInterrupted: 'Interrotta, riprenderà quando la stampante sarà libera',
       scheduleFailedReason: 'Asciugatura pianificata non riuscita: {{reason}}',
       scheduleFailedUnknown: 'Errore sconosciuto',
+      scheduleFailedDidNotStart: 'La stampante ha accettato il comando, ma l\'AMS non ha avviato l\'essiccazione',
       dismissFailed: 'Ignora',
     },
     amsBackup: {

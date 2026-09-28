@@ -713,6 +713,7 @@ export default {
       waitingInterrupted: '已中斷，將在印表機空閒後重新開始',
       scheduleFailedReason: '預約乾燥失敗：{{reason}}',
       scheduleFailedUnknown: '未知錯誤',
+      scheduleFailedDidNotStart: '印表機已接受指令，但 AMS 沒有開始乾燥',
       dismissFailed: '忽略',
     },
     amsBackup: {

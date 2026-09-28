@@ -713,6 +713,7 @@ export default {
       waitingInterrupted: 'Interrompu, reprendra lorsque l\'imprimante sera libre',
       scheduleFailedReason: 'Échec du séchage planifié : {{reason}}',
       scheduleFailedUnknown: 'Erreur inconnue',
+      scheduleFailedDidNotStart: 'L\'imprimante a accepté la commande, mais l\'AMS n\'a pas commencé le séchage',
       dismissFailed: 'Masquer',
     },
     amsBackup: {

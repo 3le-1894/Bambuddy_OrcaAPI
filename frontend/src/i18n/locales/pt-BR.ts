@@ -713,6 +713,7 @@ export default {
       waitingInterrupted: 'Interrompida, será retomada quando a impressora estiver livre',
       scheduleFailedReason: 'Falha na secagem agendada: {{reason}}',
       scheduleFailedUnknown: 'Erro desconhecido',
+      scheduleFailedDidNotStart: 'A impressora aceitou o comando, mas o AMS não começou a secar',
       dismissFailed: 'Dispensar',
     },
     amsBackup: {

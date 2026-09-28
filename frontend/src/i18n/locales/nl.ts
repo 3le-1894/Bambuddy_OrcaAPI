@@ -717,6 +717,7 @@ export default {
       waitingInterrupted: 'Onderbroken, wordt opnieuw gestart zodra de printer vrij is',
       scheduleFailedReason: 'Gepland drogen mislukt: {{reason}}',
       scheduleFailedUnknown: 'Onbekende fout',
+      scheduleFailedDidNotStart: 'De printer heeft de opdracht geaccepteerd, maar de AMS is niet begonnen met drogen',
       dismissFailed: 'Negeren',
     },
     // AMS Filament Backup status badge (printer-wide auto-switch to another spool)

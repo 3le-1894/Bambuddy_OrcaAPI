@@ -712,6 +712,7 @@ export default {
       waitingInterrupted: '中断されました。プリンターが空き次第、再開します',
       scheduleFailedReason: '予約した乾燥に失敗しました: {{reason}}',
       scheduleFailedUnknown: '不明なエラー',
+      scheduleFailedDidNotStart: 'プリンターはコマンドを受け付けましたが、AMSは乾燥を開始しませんでした',
       dismissFailed: '閉じる',
     },
     amsBackup: {

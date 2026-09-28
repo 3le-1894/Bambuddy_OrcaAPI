@@ -680,6 +680,7 @@ export default {
       waitingInterrupted: "Прервано, возобновится, когда принтер освободится",
       scheduleFailedReason: "Не удалось выполнить запланированную сушку: {{reason}}",
       scheduleFailedUnknown: "Неизвестная ошибка",
+      scheduleFailedDidNotStart: "Принтер принял команду, но AMS не начал сушку",
       dismissFailed: "Скрыть",
     },
     amsBackup: {

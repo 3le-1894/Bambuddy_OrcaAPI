@@ -713,6 +713,7 @@ export default {
       waitingInterrupted: 'Kesildi, yazıcı boşaldığında yeniden başlayacak',
       scheduleFailedReason: 'Zamanlanmış kurutma başarısız oldu: {{reason}}',
       scheduleFailedUnknown: 'Bilinmeyen hata',
+      scheduleFailedDidNotStart: 'Yazıcı komutu kabul etti ancak AMS kurutmaya başlamadı',
       dismissFailed: 'Kapat',
     },
     amsBackup: {
