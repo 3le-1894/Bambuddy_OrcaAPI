@@ -513,7 +513,7 @@ _printer_offline_notify_tasks: dict[int, asyncio.Task] = {}
 _PRINTER_OFFLINE_NOTIFY_DEBOUNCE_SECONDS = 60.0
 
 
-# HMS short-code → human-readable failure reason. Used by _dispatch_archive_update
+# HMS short-code → failure_reason key. Used by _dispatch_archive_update
 # when status="failed" to label the print's failure_reason in archives.
 #
 # Earlier code matched on `module` alone (e.g. "any module 0x0C HMS → Layer shift"),
@@ -561,6 +561,35 @@ _HMS_FAILURE_REASONS: dict[str, str] = {
     "0701_8007": "cloggedNozzle",
     "0701_8013": "cloggedNozzle",
     "0702_8003": "cloggedNozzle",
+    # AI print monitoring — spaghetti / the model coming off the plate.
+    # `spaghettiDetached` is a key the archive editor already offers for this
+    # failure mode, not a new one, so a derived reason opens the dropdown on
+    # that option rather than blank — and survives the next save, which clears
+    # any value the editor does not recognise.
+    #
+    # A module-0x0C row is safe here despite the warning above: that warning is
+    # about matching on the module alone, and 0C00_8042 is a full short code
+    # with a documented meaning ("The AI print monitor has detected a spaghetti
+    # defect", hms_errors.py). The H2D cancel echo is 0C00_001B, so the two
+    # cannot collide.
+    #
+    # 0300_8003's own text ends "before continuing your print", but on an X2D
+    # it arrives with the print already paused, offering only
+    # RESUME_PRINTING_DEFECTS / STOP_PRINTING — a halt waiting on the user.
+    #
+    # Two neighbours are left out on purpose, so this does not get re-derived:
+    #   * 0C00_C004 "Possible spaghetti failure was detected." — "possible"
+    #     reads as a warning about a print that is still running, not a halt.
+    #   * 0300_800A is AI monitoring too, but it reports a filament pile-up in
+    #     the waste chute. That is not the print failing.
+    #
+    # That line is drawn from the text, not from `severity`, because severity
+    # cannot draw it: 0300_8003 reaches us through `print_error`, a bare
+    # module/error word with no level in it, and bambu_mqtt.py gives every
+    # print_error entry a flat severity=3. Matching on the short code alone is
+    # the right shape for derive_failure_reason, not an omission.
+    "0300_8003": "spaghettiDetached",
+    "0C00_8042": "spaghettiDetached",
 }
 
 
@@ -575,11 +604,13 @@ def _hms_short_code(attr: int, code: int | str) -> str:
 
 
 def derive_failure_reason(status: str, hms_errors: list[dict] | None) -> str | None:
-    """Derive a human-readable failure_reason for an archived print.
+    """Derive the failure_reason key for an archived print.
 
-    Returns "User cancelled" for cancelled/aborted prints; for failed prints,
-    returns the first matching reason from _HMS_FAILURE_REASONS, or None when
-    no HMS code matches (don't guess — null is honest).
+    Returns "userCancelled" for cancelled/aborted prints; for failed prints,
+    returns the first matching key from _HMS_FAILURE_REASONS, or None when
+    no HMS code matches (don't guess — null is honest). The keys are the
+    archive editor's vocabulary (_FAILURE_REASON_KEYS in print_log.py) and are
+    translated at render time.
     """
     if status in ("aborted", "cancelled"):
         return "userCancelled"
