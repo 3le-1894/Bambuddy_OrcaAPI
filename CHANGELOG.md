@@ -2,6 +2,11 @@
 
 All notable changes to Bambuddy will be documented in this file.
 
+## [1.2.5.7] - Unreleased
+
+### Fixed
+- **Installing or updating no longer runs out of memory on 2 GB machines (#3181, reported by @PhilippeP62)** — Every installer and updater builds the frontend with `npm run build`, which also ran the TypeScript type check. That check alone needs about 1 GB of Node memory, the whole default allowance on a 2 GB machine such as the standard Proxmox LXC or a 2 GB Raspberry Pi, so the build crashed with "JavaScript heap out of memory". On the Proxmox helper script that left the install without its database and nobody could sign in; Bambuddy's own update script rolled back but could never finish an update. The build now only bundles the frontend, and the type check runs on its own in development and CI (`npm run typecheck`). That also fixes CI's type-check job and the pre-commit hook, which ran `tsc --noEmit` against a config that lists no files and so had been passing without checking anything.
+
 ## [1.2.5.6] - 2026-09-24
 
 ### Added
