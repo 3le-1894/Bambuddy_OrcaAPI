@@ -5,17 +5,52 @@
 # comment. Each person counts once, and the issue author and the maintainer
 # are left out. Read-only: it only queries the GitHub API through gh.
 #
-# Usage: ./feature_votes.sh [limit]      (default: all issues)
-#        ./feature_votes.sh --md [limit] (Markdown table)
+# Usage: ./feature_votes.sh --help
 
 set -euo pipefail
 
+show_help() {
+    cat <<'EOF'
+Usage: ./feature_votes.sh [options] [limit]
+
+Rank open enhancement issues (without the contrib label) by thumbs-up votes.
+
+Arguments:
+  limit         Show only the top N issues (default: all)
+
+Options:
+  --md          Print a Markdown table with issue links
+  -h, --help    Show this help message
+
+Columns:
+  votes         Different people who voted on the issue or the poll comment,
+                without the issue author and the maintainer (ranked by this)
+  on issue      Thumbs-up on the issue itself
+  on poll       Thumbs-up on the "gauge community interest" comment
+                ("-" when the issue has no such comment)
+
+Examples:
+  ./feature_votes.sh            All issues
+  ./feature_votes.sh 20         Top 20
+  ./feature_votes.sh --md 20    Top 20 as Markdown
+EOF
+}
+
 FORMAT=text
-if [[ "${1:-}" == "--md" ]]; then
-    FORMAT=md
+LIMIT=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help) show_help; exit 0 ;;
+        --md) FORMAT=md ;;
+        *[!0-9]*|"")
+            echo "Unknown option: $1" >&2
+            echo "Run ./feature_votes.sh --help for usage." >&2
+            exit 1
+            ;;
+        *) LIMIT="$1" ;;
+    esac
     shift
-fi
-LIMIT="${1:-0}"
+done
 
 command -v gh >/dev/null || { echo "gh (GitHub CLI) is required" >&2; exit 1; }
 gh auth status >/dev/null 2>&1 || { echo "gh is not logged in; run: gh auth login" >&2; exit 1; }
