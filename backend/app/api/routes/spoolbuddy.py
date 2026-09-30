@@ -891,7 +891,7 @@ async def update_spool_weight(
     update while the Spoolman row the user is actually looking at stayed
     unchanged (#1530). Mirrors the routing already used by ``nfc/tag-scanned``.
     """
-    from backend.app.api.routes._spoolman_helpers import _safe_float, spoolman_tare
+    from backend.app.api.routes._spoolman_helpers import _safe_float, spoolman_net_weight, spoolman_tare
     from backend.app.models.spool import Spool
 
     sm_client = await _get_spoolman_client_or_none(db)
@@ -920,7 +920,6 @@ async def update_spool_weight(
     async with _translate_spoolbuddy_errors():
         sm_spool = await sm_client.get_spool(req.spool_id)
 
-    filament = sm_spool.get("filament") or {}
     core_weight, tare_source = spoolman_tare(sm_spool)
     spool_weight_warning: str | None = None
     if tare_source == "fallback":
@@ -932,7 +931,7 @@ async def update_spool_weight(
             "spool_weight_not_set: Spoolman spool, filament and vendor have no empty-spool weight configured; "
             "weight estimate uses 250g fallback"
         )
-    label_weight = _safe_float(filament.get("weight"), 1000.0)
+    label_weight = _safe_float(spoolman_net_weight(sm_spool), 1000.0)
     remaining_weight = max(0.0, req.weight_grams - core_weight)
 
     async with _translate_spoolbuddy_errors():
