@@ -4871,6 +4871,7 @@ class PrintScheduler:
             if unsupported:
                 row.status = "failed"
                 row.error_message = unsupported
+                row.error_code = drying_preflight.DETAIL_CODES.get(unsupported)
                 row.completed_at = now
                 logger.warning("Scheduled drying %d: %s", row.id, unsupported)
                 continue
@@ -4993,7 +4994,8 @@ class PrintScheduler:
                     row.ams_id,
                 )
                 row.status = "failed"
-                row.error_message = "The printer accepted the drying command, but the AMS did not start drying"
+                row.error_message = drying_preflight.DID_NOT_START_DETAIL
+                row.error_code = drying_preflight.DETAIL_CODES[drying_preflight.DID_NOT_START_DETAIL]
                 row.completed_at = now
             return
         if dry_time > 0:

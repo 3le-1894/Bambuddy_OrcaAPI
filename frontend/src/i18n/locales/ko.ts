@@ -675,6 +675,7 @@ export default {
       waitingInterrupted: '중단됨, 프린터가 사용 가능해지면 다시 시작됩니다',
       scheduleFailedReason: '예약된 건조에 실패했습니다: {{reason}}',
       scheduleFailedUnknown: '알 수 없는 오류',
+      scheduleFailedDidNotStart: '프린터가 명령을 수락했지만 AMS가 건조를 시작하지 않았습니다',
       dismissFailed: '닫기',
     },
     amsBackup: {

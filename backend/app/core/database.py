@@ -5113,6 +5113,11 @@ async def run_migrations(conn):
             {"off": False},
         )
 
+    # Migration: a code for why a scheduled drying failed, so the card can show
+    # the reason in the user's language. Nullable: rows that failed before this
+    # keep showing their English error_message.
+    await _safe_execute(conn, "ALTER TABLE scheduled_dryings ADD COLUMN error_code VARCHAR(32)")
+
 
 async def _migrate_confirm_prompt_body_template(conn) -> None:
     """Replace the one-tap verdict URLs in the outcome prompt's body (#1898).

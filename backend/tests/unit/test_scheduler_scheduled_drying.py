@@ -200,6 +200,8 @@ async def test_screen_only_model_fails_instead_of_dispatching(scheduler, db_sess
     await db_session.refresh(row)
     assert row.status == "failed"
     assert row.error_message
+    # The code the card translates; error_message stays English for the API.
+    assert row.error_code == "screen_only"
     assert row.completed_at is not None
 
 
@@ -217,6 +219,7 @@ async def test_firmware_below_minimum_fails(scheduler, db_session, printer_facto
     await db_session.refresh(row)
     assert row.status == "failed"
     assert row.error_message
+    assert row.error_code == "unsupported"
     assert row.completed_at is not None
 
 
@@ -676,6 +679,7 @@ async def test_running_with_a_parked_countdown_on_an_idle_printer_fails(schedule
     await db_session.refresh(row)
     assert row.status == "failed"
     assert "did not start drying" in row.error_message
+    assert row.error_code == "did_not_start"
     assert row.completed_at is not None
 
 
@@ -750,3 +754,15 @@ class TestDryingIsOnlyParked:
     def test_offline_printer_is_not_parked(self, mock_pm):
         mock_pm.get_status.return_value = None
         assert PrintScheduler._drying_is_only_parked(1) is False
+
+
+def test_every_failure_detail_has_a_code():
+    """Each English failure text the scheduler can store maps to a code the
+    frontend translates (FAILED_REASON_KEYS in PrintersPage.tsx)."""
+    from backend.app.services import drying_preflight
+
+    assert drying_preflight.DETAIL_CODES == {
+        drying_preflight.SCREEN_ONLY_DETAIL: "screen_only",
+        drying_preflight.UNSUPPORTED_DETAIL: "unsupported",
+        drying_preflight.DID_NOT_START_DETAIL: "did_not_start",
+    }

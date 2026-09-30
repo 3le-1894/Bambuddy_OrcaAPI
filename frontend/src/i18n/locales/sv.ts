@@ -717,6 +717,7 @@ export default {
       waitingInterrupted: 'Avbruten, kommer att starta om när skrivaren är ledig',
       scheduleFailedReason: 'Schemalagd torkning misslyckades: {{reason}}',
       scheduleFailedUnknown: 'Okänt fel',
+      scheduleFailedDidNotStart: 'Skrivaren accepterade kommandot, men AMS började inte torka',
       dismissFailed: 'Avfärda',
     },
     // AMS Filament Backup status badge (printer-wide auto-switch to another spool)

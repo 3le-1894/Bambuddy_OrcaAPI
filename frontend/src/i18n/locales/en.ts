@@ -717,6 +717,7 @@ export default {
       waitingInterrupted: 'Interrupted, will restart when the printer is free',
       scheduleFailedReason: 'Scheduled drying failed: {{reason}}',
       scheduleFailedUnknown: 'Unknown error',
+      scheduleFailedDidNotStart: 'The printer accepted the command, but the AMS did not start drying',
       dismissFailed: 'Dismiss',
     },
     // AMS Filament Backup status badge (printer-wide auto-switch to another spool)

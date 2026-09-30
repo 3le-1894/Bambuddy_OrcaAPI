@@ -713,6 +713,7 @@ export default {
       waitingInterrupted: '已中断，将在打印机空闲后重新开始',
       scheduleFailedReason: '预约干燥失败：{{reason}}',
       scheduleFailedUnknown: '未知错误',
+      scheduleFailedDidNotStart: '打印机已接受命令，但 AMS 没有开始干燥',
       dismissFailed: '忽略',
     },
     amsBackup: {

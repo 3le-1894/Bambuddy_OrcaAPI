@@ -713,6 +713,7 @@ export default {
       waitingInterrupted: 'Interrumpido, se reanudará cuando la impresora esté libre',
       scheduleFailedReason: 'El secado programado falló: {{reason}}',
       scheduleFailedUnknown: 'Error desconocido',
+      scheduleFailedDidNotStart: 'La impresora aceptó el comando, pero el AMS no empezó a secar',
       dismissFailed: 'Descartar',
     },
     amsBackup: {

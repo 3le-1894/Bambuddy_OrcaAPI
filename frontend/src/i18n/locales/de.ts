@@ -713,6 +713,7 @@ export default {
       waitingInterrupted: 'Unterbrochen, startet erneut, sobald der Drucker frei ist',
       scheduleFailedReason: 'Geplante Trocknung fehlgeschlagen: {{reason}}',
       scheduleFailedUnknown: 'Unbekannter Fehler',
+      scheduleFailedDidNotStart: 'Der Drucker hat den Befehl angenommen, aber das AMS hat nicht mit dem Trocknen begonnen',
       dismissFailed: 'Ausblenden',
     },
     amsBackup: {

@@ -58,6 +58,19 @@ function waitingReasonKey(reason: string | null | undefined): string | undefined
   return reason ? WAITING_REASON_KEYS[reason] : undefined;
 }
 
+// Why a scheduled drying failed, by the code the scheduler stores. A row with
+// no code (failed before codes existed) or an unknown one shows the backend's
+// English error_message instead.
+const FAILED_REASON_KEYS: Record<string, string> = {
+  screen_only: 'printers.drying.screenOnly',
+  unsupported: 'printers.drying.notSupported',
+  did_not_start: 'printers.drying.scheduleFailedDidNotStart',
+};
+
+function failedReasonKey(code: string | null | undefined): string | undefined {
+  return code ? FAILED_REASON_KEYS[code] : undefined;
+}
+
 // Which cannot-dry code to name when the firmware reports several at once.
 // Same priority as the backend's drying_preflight.primary_reason_code, so the
 // button's tooltip and a scheduled row's waiting reason describe one blocked
@@ -2049,6 +2062,7 @@ function ScheduledDryingBanner({ printerId, dryingActive, timeFormat }: { printe
       {rows.map(s => {
         const failed = s.status === 'failed';
         const reasonKey = waitingReasonKey(s.waiting_reason);
+        const failedKey = failedReasonKey(s.error_code);
         return (
           <div
             key={s.id}
@@ -2060,7 +2074,7 @@ function ScheduledDryingBanner({ printerId, dryingActive, timeFormat }: { printe
             <span className={failed ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}>
               {failed ? (
                 t('printers.drying.scheduleFailedReason', {
-                  reason: s.error_message || t('printers.drying.scheduleFailedUnknown'),
+                  reason: failedKey ? t(failedKey) : s.error_message || t('printers.drying.scheduleFailedUnknown'),
                 })
               ) : (
                 <>

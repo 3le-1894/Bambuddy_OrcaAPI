@@ -501,6 +501,9 @@ export interface ScheduledDrying {
   status: string;
   waiting_reason: string | null;
   error_message: string | null;
+  // Why a failed run failed (screen_only / unsupported / did_not_start); null on
+  // rows that failed before codes existed, which show error_message instead.
+  error_code?: string | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
