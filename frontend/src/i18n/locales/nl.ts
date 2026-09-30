@@ -1688,6 +1688,16 @@ export default {
     printActivity: 'Afdrukactiviteit',
     filamentTypes: 'Filamenttypen',
     filamentTrends: 'Filamenttrends',
+    // Consumption/cost grouped by the internal material number (#2870).
+    materialNumbers: {
+      title: 'Per materiaalnummer',
+      empty: 'Nog geen materiaalnummers toegewezen. Voeg ze toe aan spoelen in de voorraad om verbruik en kosten hier te groeperen.',
+      loadFailed: 'De statistieken per materiaalnummer konden niet worden geladen.',
+      spools: 'Spoelen',
+      remaining: 'Resterend',
+      consumed: 'Verbruikt',
+      cost: 'Kosten',
+    },
     // Consumption/cost grouped by purchase-source supplier (#2988).
     suppliers: {
       title: 'Per leverancier',
@@ -4084,6 +4094,9 @@ export default {
       nextPage: 'Volgende pagina',
       zoomIn: 'Inzoomen',
       zoomOut: 'Uitzoomen',
+      resetZoom: 'Zoom herstellen',
+      fullscreen: 'Volledig scherm',
+      exitFullscreen: 'Volledig scherm afsluiten',
       emptySheet: 'Dit werkblad is leeg',
       truncatedRows: 'Eerste {{shown}} van {{total}} rijen worden getoond',
       truncatedCols: 'Eerste {{shown}} van {{total}} kolommen worden getoond',
@@ -4866,6 +4879,11 @@ export default {
     storageLocationNone: 'Geen locatie ingesteld',
     lowStockThresholdOverride: 'Drempel lage voorraad (deze spoel)',
     lowStockThresholdOverrideHelp: 'Laat leeg om de globale drempel ({{global}}%) te gebruiken.',
+    // Internal material / article number (#2870)
+    materialNumber: 'Materiaalnr.',
+    materialNumberPlaceholder: 'bijv. 15',
+    materialNumberHelp: 'Intern inkoopnummer - gedeeld door alle spoelen van dit product. Nieuwe spoelen van hetzelfde product nemen het over.',
+    materialNumberNone: 'Geen materiaalnummer',
     // Suppliers (#2988): the master list and the per-spool assignments.
     suppliers: {
       label: 'Leveranciers',

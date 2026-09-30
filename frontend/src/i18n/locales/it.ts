@@ -1671,6 +1671,16 @@ export default {
     printActivity: 'Attivita di stampa',
     filamentTypes: 'Tipi di filamento',
     filamentTrends: 'Trend filamento',
+    // Consumption/cost grouped by the internal material number (#2870).
+    materialNumbers: {
+      title: 'Per numero materiale',
+      empty: 'Nessun numero materiale assegnato. Aggiungili alle bobine nell\'inventario per raggruppare qui consumi e costi.',
+      loadFailed: 'Impossibile caricare le statistiche per numero materiale.',
+      spools: 'Bobine',
+      remaining: 'Rimanente',
+      consumed: 'Consumato',
+      cost: 'Costo',
+    },
     suppliers: {
       title: 'Per fornitore',
       empty: 'Nessun acquisto registrato. Indica su una bobina da quale fornitore è stata acquistata per raggruppare qui consumi e costi.',
@@ -4041,6 +4051,9 @@ export default {
       nextPage: 'Pagina successiva',
       zoomIn: 'Ingrandisci',
       zoomOut: 'Riduci',
+      resetZoom: 'Reimposta zoom',
+      fullscreen: 'Schermo intero',
+      exitFullscreen: 'Esci da schermo intero',
       emptySheet: 'Questo foglio è vuoto',
       truncatedRows: 'Visualizzate le prime {{shown}} righe di {{total}}',
       truncatedCols: 'Visualizzate le prime {{shown}} colonne di {{total}}',
@@ -4813,6 +4826,11 @@ export default {
     storageLocationNone: 'Nessuna posizione impostata',
     lowStockThresholdOverride: 'Soglia scorte basse (questa bobina)',
     lowStockThresholdOverrideHelp: 'Lascia vuoto per usare la soglia globale ({{global}}%).',
+    // Internal material / article number (#2870)
+    materialNumber: 'N. materiale',
+    materialNumberPlaceholder: 'es. 15',
+    materialNumberHelp: 'Numero interno di acquisto - condiviso da tutte le bobine di questo prodotto. Le nuove bobine dello stesso prodotto lo ereditano.',
+    materialNumberNone: 'Nessun numero materiale',
     suppliers: {
       label: 'Fornitori',
       none: 'Nessun fornitore',

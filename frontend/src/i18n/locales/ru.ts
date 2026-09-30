@@ -1601,6 +1601,16 @@ export default {
     printActivity: "Активность печати",
     filamentTypes: "Типы филамента",
     filamentTrends: "Расход филамента",
+    // Consumption/cost grouped by the internal material number (#2870).
+    materialNumbers: {
+      title: 'По артикулам',
+      empty: 'Артикулы пока не назначены. Добавьте их катушкам в инвентаре, чтобы группировать здесь расход и затраты.',
+      loadFailed: 'Не удалось загрузить статистику по артикулам.',
+      spools: 'Катушки',
+      remaining: 'Остаток',
+      consumed: 'Израсходовано',
+      cost: 'Стоимость',
+    },
     suppliers: {
       title: "По поставщикам",
       empty: "Покупки пока не зарегистрированы. Отметьте на катушке, у какого поставщика она была куплена, чтобы сгруппировать здесь расход и затраты.",
@@ -3855,6 +3865,9 @@ export default {
       nextPage: 'Следующая страница',
       zoomIn: 'Увеличить',
       zoomOut: 'Уменьшить',
+      resetZoom: 'Сбросить масштаб',
+      fullscreen: 'На весь экран',
+      exitFullscreen: 'Выйти из полноэкранного режима',
       emptySheet: 'Этот лист пуст',
       truncatedRows: 'Показаны первые {{shown}} из {{total}} строк',
       truncatedCols: 'Показаны первые {{shown}} из {{total}} столбцов',
@@ -4601,6 +4614,11 @@ export default {
     storageLocationNone: "Место не указано",
     lowStockThresholdOverride: "Порог малого остатка (эта катушка)",
     lowStockThresholdOverrideHelp: "Оставьте пустым, чтобы использовать общий порог ({{global}}%).",
+    // Internal material / article number (#2870)
+    materialNumber: 'Артикул',
+    materialNumberPlaceholder: 'напр. 15',
+    materialNumberHelp: 'Внутренний закупочный номер — общий для всех катушек этого товара. Новые катушки того же товара наследуют его.',
+    materialNumberNone: 'Без артикула',
     suppliers: {
       label: "Поставщики",
       none: "Без поставщика",

@@ -1688,6 +1688,16 @@ export default {
     printActivity: 'Print Activity',
     filamentTypes: 'Filament Types',
     filamentTrends: 'Filament Trends',
+    // Consumption/cost grouped by the internal material number (#2870).
+    materialNumbers: {
+      title: 'By Material Number',
+      empty: 'No material numbers assigned yet. Add them to spools in the inventory to group consumption and costs here.',
+      loadFailed: 'Could not load the material number statistics.',
+      spools: 'Spools',
+      remaining: 'Remaining',
+      consumed: 'Consumed',
+      cost: 'Cost',
+    },
     // Consumption/cost grouped by purchase-source supplier (#2988).
     suppliers: {
       title: 'By Supplier',
@@ -4084,6 +4094,9 @@ export default {
       nextPage: 'Next page',
       zoomIn: 'Zoom in',
       zoomOut: 'Zoom out',
+      resetZoom: 'Reset zoom',
+      fullscreen: 'Fullscreen',
+      exitFullscreen: 'Exit fullscreen',
       emptySheet: 'This sheet is empty',
       truncatedRows: 'Showing the first {{shown}} of {{total}} rows',
       truncatedCols: 'Showing the first {{shown}} of {{total}} columns',
@@ -4866,6 +4879,11 @@ export default {
     storageLocationNone: 'No location set',
     lowStockThresholdOverride: 'Low-stock threshold (this spool)',
     lowStockThresholdOverrideHelp: 'Leave blank to use the global threshold ({{global}}%).',
+    // Internal material / article number (#2870)
+    materialNumber: 'Material No.',
+    materialNumberPlaceholder: 'e.g. 15',
+    materialNumberHelp: 'Internal purchasing number — shared by all spools of this product. New spools of the same product inherit it.',
+    materialNumberNone: 'No material number',
     // Suppliers (#2988): the master list and the per-spool assignments.
     suppliers: {
       label: 'Suppliers',

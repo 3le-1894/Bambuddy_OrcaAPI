@@ -1671,6 +1671,16 @@ export default {
     printActivity: '打印活动',
     filamentTypes: '耗材类型',
     filamentTrends: '耗材趋势',
+    // Consumption/cost grouped by the internal material number (#2870).
+    materialNumbers: {
+      title: '按物料号',
+      empty: '尚未分配物料号。在库存中为料盘添加物料号，即可在此按其汇总消耗量和成本。',
+      loadFailed: '无法加载物料号统计数据。',
+      spools: '料盘',
+      remaining: '剩余',
+      consumed: '已消耗',
+      cost: '成本',
+    },
     suppliers: {
       title: '按供应商',
       empty: '暂无购买记录。在料盘上标记其购买来源供应商后，即可在此按供应商统计消耗和成本。',
@@ -4041,6 +4051,9 @@ export default {
       nextPage: '下一页',
       zoomIn: '放大',
       zoomOut: '缩小',
+      resetZoom: '重置缩放',
+      fullscreen: '全屏',
+      exitFullscreen: '退出全屏',
       emptySheet: '此工作表为空',
       truncatedRows: '仅显示前 {{shown}} 行，共 {{total}} 行',
       truncatedCols: '仅显示前 {{shown}} 列，共 {{total}} 列',
@@ -4813,6 +4826,11 @@ export default {
     storageLocationNone: '未设置位置',
     lowStockThresholdOverride: '低库存阈值（此料盘）',
     lowStockThresholdOverrideHelp: '留空以使用全局阈值（{{global}}%）。',
+    // Internal material / article number (#2870)
+    materialNumber: '物料号',
+    materialNumberPlaceholder: '例如 15',
+    materialNumberHelp: '内部采购编号 — 同一产品的所有料盘共用。同一产品的新料盘会自动继承。',
+    materialNumberNone: '无物料号',
     suppliers: {
       label: '供应商',
       none: '无供应商',

@@ -1672,6 +1672,16 @@ export default {
     printActivity: 'Baskı Etkinliği',
     filamentTypes: 'Filament Türleri',
     filamentTrends: 'Filament Trendleri',
+    // Consumption/cost grouped by the internal material number (#2870).
+    materialNumbers: {
+      title: 'Malzeme Numarasına Göre',
+      empty: 'Henüz malzeme numarası atanmadı. Tüketim ve maliyetleri burada gruplamak için envanterdeki makaralara malzeme numarası ekleyin.',
+      loadFailed: 'Malzeme numarası istatistikleri yüklenemedi.',
+      spools: 'Makaralar',
+      remaining: 'Kalan',
+      consumed: 'Tüketilen',
+      cost: 'Maliyet',
+    },
     suppliers: {
       title: 'Tedarikçiye Göre',
       empty: 'Henüz satın alma kaydı yok. Tüketim ve maliyetleri burada gruplamak için bir makarada hangi tedarikçiden alındığını işaretleyin.',
@@ -4048,6 +4058,9 @@ export default {
       nextPage: 'Sonraki sayfa',
       zoomIn: 'Yakınlaştır',
       zoomOut: 'Uzaklaştır',
+      resetZoom: 'Yakınlaştırmayı sıfırla',
+      fullscreen: 'Tam ekran',
+      exitFullscreen: 'Tam ekrandan çık',
       emptySheet: 'Bu sayfa boş',
       truncatedRows: '{{total}} satırdan ilk {{shown}} tanesi gösteriliyor',
       truncatedCols: '{{total}} sütundan ilk {{shown}} tanesi gösteriliyor',
@@ -4813,6 +4826,11 @@ export default {
     storageLocationNone: 'Konum ayarlanmamış',
     lowStockThresholdOverride: 'Düşük stok eşiği (bu makara)',
     lowStockThresholdOverrideHelp: 'Global eşiği kullanmak için boş bırakın (%{{global}}).',
+    // Internal material / article number (#2870)
+    materialNumber: 'Malzeme No.',
+    materialNumberPlaceholder: 'örn. 15',
+    materialNumberHelp: 'Dahili satın alma numarası - bu ürünün tüm makaraları tarafından paylaşılır. Aynı ürünün yeni makaraları bu numarayı devralır.',
+    materialNumberNone: 'Malzeme numarası yok',
     suppliers: {
       label: 'Tedarikçiler',
       none: 'Tedarikçi yok',
