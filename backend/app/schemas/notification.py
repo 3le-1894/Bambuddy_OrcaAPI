@@ -94,6 +94,9 @@ class NotificationProviderBase(BaseModel):
     # Event triggers - First layer complete
     on_first_layer_complete: bool = Field(default=False, description="Notify when first layer completes")
 
+    # Messages from connected apps (POST /notifications/app-message)
+    on_app_message: bool = Field(default=False, description="Deliver messages other applications send")
+
     # Event triggers - Inventory stock alerts
     # Missing from this schema until now, so every payload naming them was
     # dropped silently: the UI's toggles round-tripped as 200 OK and the row
@@ -203,6 +206,9 @@ class NotificationProviderUpdate(BaseModel):
     # Event triggers - First layer complete
     on_first_layer_complete: bool | None = None
 
+    # Messages from connected apps
+    on_app_message: bool | None = None
+
     # Event triggers - Inventory stock alerts
     on_stock_reorder_alert: bool | None = None
     on_stock_break_alert: bool | None = None
@@ -277,6 +283,42 @@ class NotificationProviderResponse(NotificationProviderBase):
 
     class Config:
         from_attributes = True
+
+
+class AppMessage(BaseModel):
+    """A message another application sends through Bambuddy's notification channels."""
+
+    title: str = Field(min_length=1, max_length=120)
+    message: str = Field(min_length=1, max_length=2000)
+    url: str | None = Field(default=None, max_length=500, description="A link the message points to (http or https)")
+
+    @field_validator("title", "message")
+    @classmethod
+    def _plain_text(cls, value: str) -> str:
+        # Plain text: no control characters beyond line breaks and tabs.
+        cleaned = "".join(ch for ch in value if ch in "\n\t" or ch.isprintable()).strip()
+        if not cleaned:
+            raise ValueError("must not be empty")
+        return cleaned
+
+    @field_validator("url")
+    @classmethod
+    def _http_url(cls, value: str | None) -> str | None:
+        if value is None or value.strip() == "":
+            return None
+        value = value.strip()
+        if not value.lower().startswith(("http://", "https://")) or any(c.isspace() for c in value):
+            raise ValueError("must be an http or https address")
+        return value
+
+
+class AppMessageResult(BaseModel):
+    channels: int = Field(description="How many channels the message was handed to")
+
+
+class AppMessageChannel(BaseModel):
+    name: str
+    provider_type: str
 
 
 class NotificationTestRequest(BaseModel):

@@ -1279,6 +1279,30 @@ class NotificationService:
                     printer_name=printer_name,
                 )
 
+    async def on_app_message(
+        self,
+        db: AsyncSession,
+        *,
+        sender: str,
+        title: str,
+        message: str,
+        url: str | None = None,
+    ) -> int:
+        """A message another application sends through Bambuddy.
+
+        Goes to every enabled channel with "Messages from connected apps" on,
+        through the same path as Bambuddy's own events: quiet hours, the daily
+        digest and the log (whose event type names the sender). The text is
+        the app's own; a link, when given, is appended so every channel type
+        carries it. Returns how many channels it was handed to.
+        """
+        providers = await self._get_providers_for_event(db, "on_app_message")
+        if not providers:
+            return 0
+        body = f"{message}\n{url}" if url else message
+        await self._send_to_providers(providers, title, body, db, event_type=f"app:{sender}"[:50])
+        return len(providers)
+
     async def on_print_start(
         self,
         printer_id: int,
