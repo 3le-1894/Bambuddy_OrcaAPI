@@ -13,17 +13,22 @@ export function mapModelCode(ssdpModel: string | null): string {
     'BL-P001': 'X1C',
     'BL-P002': 'X1',
     'BL-P003': 'X1E',
+    'C13': 'X1E',
     // X2 Series
     'N6': 'X2D',
     // A2 Series
     'N9': 'A2L',
-    // P Series
-    'C11': 'P1S',
-    'C12': 'P1P',
-    'C13': 'P2S',
+    // P Series. A real P1P 3MF carries C11 next to "Bambu Lab P1P"; the
+    // backend's PRINTER_MODEL_ID_MAP and the virtual printer use the same codes.
+    'C11': 'P1P',
+    'C12': 'P1S',
+    'N7': 'P2S',
     // A1 Series
     'N2S': 'A1',
     'N1': 'A1 Mini',
+    'A11': 'A1',
+    'A12': 'A1 Mini',
+    'A04': 'A1 Mini',
     // Direct matches
     'X1C': 'X1C',
     'X1': 'X1',
