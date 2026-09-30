@@ -3583,7 +3583,12 @@ export default {
     eta: '預計完成時間',
     printerIdle: '印表機空閒',
     printerOffline: '印表機離線',
+    layer: '層數',
+    remaining: '剩餘時間',
     builder: {
+      artwork: '外觀',
+      artworkClassic: '經典',
+      artworkV2: '第 2 版',
       title: '直播疊加層',
       description: '產生直播疊加層的網址：全螢幕攝影機畫面上疊加即時列印資訊，可用於 OBS、牆面顯示器或任何瀏覽器來源。選擇需要的欄位並複製網址。',
       printer: '印表機',

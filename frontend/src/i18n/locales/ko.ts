@@ -3419,7 +3419,12 @@ export default {
     eta: '예상 완료',
     printerIdle: '프린터 대기 중',
     printerOffline: '프린터 오프라인',
+    layer: '레이어',
+    remaining: '남은 시간',
     builder: {
+      artwork: '디자인',
+      artworkClassic: '클래식',
+      artworkV2: '버전 2',
       title: '스트림 오버레이',
       description: '스트림 오버레이 URL을 만듭니다. 전체 화면 카메라 영상 위에 실시간 출력 정보를 겹쳐 보여주며 OBS, 벽걸이 디스플레이 등 모든 브라우저 소스에서 쓸 수 있습니다. 원하는 항목을 고르고 URL을 복사하세요.',
       printer: '프린터',

@@ -3583,7 +3583,12 @@ export default {
     eta: 'ETA',
     printerIdle: 'Stampante inattiva',
     printerOffline: 'Stampante offline',
+    layer: 'Strato',
+    remaining: 'Tempo rimanente',
     builder: {
+      artwork: 'Grafica',
+      artworkClassic: 'Classica',
+      artworkV2: 'Versione 2',
       title: 'Overlay per streaming',
       description: 'Compone l\'URL di un overlay per streaming: una vista telecamera a schermo intero con i dati di stampa in tempo reale sovrapposti, per OBS, un display a parete o qualsiasi sorgente browser. Scegli i campi e copia l\'URL.',
       printer: 'Stampante',
