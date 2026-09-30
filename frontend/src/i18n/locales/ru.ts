@@ -4792,7 +4792,6 @@ export default {
     spoolmanFilamentUnlinked: "Связь с каталогом филаментов удалена",
     noSpoolmanFilaments: "В каталоге Spoolman филаменты не найдены",
     spoolmanFilamentColorSwatch: "Цвет филамента",
-    spoolWeightManagedBySpoolman: "Масса пустой катушки задаётся в Spoolman для каждого типа филамента",
     spoolmanCatalogLoadFailed: "Не удалось загрузить каталог филаментов Spoolman",
   },
   timelapse: {
