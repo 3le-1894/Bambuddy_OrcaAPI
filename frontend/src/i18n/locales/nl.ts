@@ -3626,7 +3626,12 @@ export default {
     eta: 'ETA',
     printerIdle: 'Printer is inactief',
     printerOffline: 'Printer offline',
+    layer: 'Laag',
+    remaining: 'Resterend',
     builder: {
+      artwork: 'Vormgeving',
+      artworkClassic: 'Klassiek',
+      artworkV2: 'Versie 2',
       title: 'Streamingoverlay',
       description: 'Bouw de URL voor een streamingoverlay — een camerabeeld op volledig scherm met live afdrukgegevens eroverheen, voor OBS, een wanddisplay of elke browserbron. Kies de velden die je wilt en kopieer de URL.',
       printer: 'Printer',

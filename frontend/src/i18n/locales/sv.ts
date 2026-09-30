@@ -3625,7 +3625,12 @@ errors: {
     eta: 'Beräknad tid',
     printerIdle: 'Skrivaren är inaktiv',
     printerOffline: 'Skrivare offline',
+    layer: 'Lager',
+    remaining: 'Återstående',
     builder: {
+      artwork: 'Utseende',
+      artworkClassic: 'Klassisk',
+      artworkV2: 'Version 2',
       title: 'Strömningsöverlägg',
       description: 'Bygg URL:en för ett strömningsöverlägg — en helskärmskameravy med live utskriftsdata som visas ovanpå. Välj de fält du vill ha och kopiera URL:en.',
       printer: 'Skrivare',

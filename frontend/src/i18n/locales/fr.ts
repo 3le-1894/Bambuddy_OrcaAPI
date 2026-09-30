@@ -3584,7 +3584,12 @@ export default {
     eta: 'Fin estimée',
     printerIdle: 'Imprimante inactive',
     printerOffline: 'Imprimante hors ligne',
+    layer: 'Couche',
+    remaining: 'Temps restant',
     builder: {
+      artwork: 'Habillage',
+      artworkClassic: 'Classique',
+      artworkV2: 'Version 2',
       title: 'Incrustation de diffusion',
       description: 'Compose l\'URL d\'une incrustation de diffusion — une vue caméra plein écran avec les données d\'impression en direct par-dessus, pour OBS, un écran mural ou toute source navigateur. Choisissez les champs voulus et copiez l\'URL.',
       printer: 'Imprimante',

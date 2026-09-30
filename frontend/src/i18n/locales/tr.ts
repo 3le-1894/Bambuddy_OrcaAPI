@@ -3598,7 +3598,12 @@ export default {
     eta: 'ETA',
     printerIdle: 'Yazıcı boşta',
     printerOffline: 'Yazıcı çevrimdışı',
+    layer: 'Katman',
+    remaining: 'Kalan süre',
     builder: {
+      artwork: 'Tasarım',
+      artworkClassic: 'Klasik',
+      artworkV2: 'Sürüm 2',
       title: 'Yayın Kaplaması',
       description: 'Yayın kaplaması için URL oluşturur: tam ekran kamera görüntüsünün üzerine canlı baskı bilgileri bindirilir; OBS, duvar ekranı veya herhangi bir tarayıcı kaynağı için. İstediğiniz alanları seçip URL\'yi kopyalayın.',
       printer: 'Yazıcı',

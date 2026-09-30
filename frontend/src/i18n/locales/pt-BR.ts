@@ -3583,7 +3583,12 @@ export default {
     eta: 'ETA',
     printerIdle: 'Impressora ociosa',
     printerOffline: 'Impressora offline',
+    layer: 'Camada',
+    remaining: 'Tempo restante',
     builder: {
+      artwork: 'Visual',
+      artworkClassic: 'Clássico',
+      artworkV2: 'Versão 2',
       title: 'Sobreposição de transmissão',
       description: 'Monta a URL de uma sobreposição de transmissão: a câmera em tela cheia com os dados da impressão sobrepostos, para OBS, um painel de parede ou qualquer fonte de navegador. Escolha os campos e copie a URL.',
       printer: 'Impressora',
