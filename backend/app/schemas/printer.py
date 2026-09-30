@@ -160,7 +160,7 @@ class HMSErrorResponse(BaseModel):
     code: str
     attr: int = 0  # Attribute value for constructing wiki URL
     module: int
-    severity: int  # 1=fatal, 2=serious, 3=common, 4=info
+    severity: int  # Bambu alert level: 1 error (stopped), 2 warning (paused), 3 notification, 0 invalid
     actions: list[str] = []  # List of user-facing action keys (e.g. "CHECK_FILAMENT")
     job_id: str | None = None  # Optional job ID for actions that require it (e.g. "CHECK_ASSISTANT")
     # Canonical hex identifier the firmware uses to match HMS-related commands.
@@ -173,11 +173,11 @@ class HMSErrorResponse(BaseModel):
     # The bundled catalogue's sentence for this fault, so a client does not have
     # to carry its own copy of the same table to tell a user why a print halted
     # (#2926). English only and not localized — the catalogue ships one language.
-    # None when the catalogue does not cover the code, which is common for
-    # `hms[]`-array faults: those resolve through a lossy collapse of their
-    # 16-char identifier and many land on no key at all (#2728). A client should
-    # treat null as "no text available", never as "no fault" — `full_code` is
-    # what identifies the fault, and it is always present.
+    # Generated from Bambu Studio's HMS files, keyed by `full_code` and the
+    # printer model (#2728). None when Bambu publishes no text for the code,
+    # which it does for some codes it lists. A client should treat null as "no
+    # text available", never as "no fault" — `full_code` is what identifies the
+    # fault, and it is always present.
     description: str | None = None
 
 

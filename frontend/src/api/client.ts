@@ -429,7 +429,9 @@ export interface HMSError {
   code: string;
   attr: number;  // Attribute value for constructing wiki URL
   module: number;
-  severity: number;  // 1=fatal, 2=serious, 3=common, 4=info
+  // Bambu's alert level: 1 error (task stopped), 2 warning (task paused),
+  // 3 notification, 0 invalid (#2728).
+  severity: number;
   actions?: string[];  // List of user-facing action keys (e.g. "CHECK_FILAMENT")
   job_id?: string;  // Optional job ID for actions that require it (e.g. "CHECK_ASSISTANT")
   // Canonical hex identifier the firmware matches against — 8 chars for
@@ -437,11 +439,10 @@ export interface HMSError {
   // this back as HmsActionBody.print_error so we don't truncate the 64-bit
   // identifier into the silent-rejection short code (#1830).
   full_code?: string;
-  // The backend's resolved catalogue sentence for this fault (#2926). English
-  // only, and null when the catalogue does not cover the code. Resolved with the
-  // same lookup order this file's consumers use (full_code, then the G1_G4
-  // collapse), so it agrees with what HMSErrorModal renders — the modal still
-  // resolves its own text, and this is here for parity with the API.
+  // The backend's catalogue sentence for this fault (#2926), from the table
+  // generated out of Bambu Studio for this printer model (#2728). English only.
+  // Null when Bambu publishes no text for the code. The frontend has no table of
+  // its own: this field decides both the text and whether the fault counts.
   description?: string | null;
 }
 
