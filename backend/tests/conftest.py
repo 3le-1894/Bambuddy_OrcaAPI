@@ -166,6 +166,21 @@ def reset_slot_unlink_grace():
 
 
 @pytest.fixture(autouse=True)
+def reset_usage_tracker_sessions():
+    """Drop the usage tracker's in-flight print sessions between tests.
+
+    They live in a module-level dict keyed by printer id. Any test that runs
+    ``main.on_print_start(1, ...)`` against a mocked printer manager leaves a
+    session for printer 1 whose fields are MagicMocks, and a later test on the
+    same worker that completes a print for printer 1 picks it up as its own."""
+    from backend.app.services.usage_tracker import _active_sessions
+
+    _active_sessions.clear()
+    yield
+    _active_sessions.clear()
+
+
+@pytest.fixture(autouse=True)
 def reset_auth_enabled_cache():
     """Drop the module-level auth-enabled cache between tests (issue #2572).
 
