@@ -682,6 +682,8 @@ export default {
       hours: 'heures',
       timeRemaining: '{{time}} restant',
       active: 'Séchage',
+      notRunning: 'Séchage à l\'arrêt',
+      notRunningHint: 'L\'imprimante a un minuteur de séchage, mais le compte à rebours est arrêté et l\'AMS ne signale aucune phase de séchage. Le cycle n\'a jamais démarré ou a été mis en pause, par exemple par la limite d\'alimentation ou l\'impression en cours.',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: 'Séchage non pris en charge',
       powerRequired: 'Brancher l\'adaptateur secteur AMS pour activer le séchage',

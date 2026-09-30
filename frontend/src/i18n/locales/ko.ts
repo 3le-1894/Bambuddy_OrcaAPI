@@ -644,6 +644,8 @@ export default {
       hours: '시간',
       timeRemaining: '{{time}} 남음',
       active: '건조 중',
+      notRunning: '건조가 진행되고 있지 않음',
+      notRunningHint: '프린터에 건조 타이머가 설정되어 있지만 카운트다운이 멈췄고 AMS가 건조 단계를 보고하지 않습니다. 사이클이 시작되지 않았거나 전력 한도나 진행 중인 출력 등으로 일시 중지되었습니다.',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: '건조 지원 안 됨',
       powerRequired: '건조를 활성화하려면 AMS 전원 어댑터를 연결하세요',

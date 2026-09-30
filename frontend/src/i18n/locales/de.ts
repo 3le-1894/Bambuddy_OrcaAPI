@@ -682,6 +682,8 @@ export default {
       hours: 'Stunden',
       timeRemaining: '{{time}} verbleibend',
       active: 'Trocknung',
+      notRunning: 'Trocknung läuft nicht',
+      notRunningHint: 'Der Drucker hat einen Trocknungstimer gesetzt, aber der Countdown steht still und das AMS meldet keine Trocknungsphase. Der Zyklus wurde nie gestartet oder unterbrochen, zum Beispiel durch die Stromgrenze oder den laufenden Druck.',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: 'Trocknung nicht unterstützt',
       powerRequired: 'AMS-Netzteil anschließen, um Trocknung zu aktivieren',

@@ -682,6 +682,8 @@ export default {
       hours: 'horas',
       timeRemaining: '{{time}} restante',
       active: 'Secando',
+      notRunning: 'El secado no está en curso',
+      notRunningHint: 'La impresora tiene un temporizador de secado, pero la cuenta atrás se ha detenido y el AMS no informa de ninguna fase de secado. El ciclo nunca empezó o se pausó, por ejemplo por el límite de potencia o por la impresión en curso.',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: 'Secado no compatible',
       powerRequired: 'Conecte el adaptador de corriente del AMS para activar el secado',

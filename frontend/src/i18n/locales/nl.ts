@@ -685,6 +685,8 @@ export default {
       hours: 'uren',
       timeRemaining: '{{time}} resterend',
       active: 'Drogen',
+      notRunning: 'Drogen loopt niet',
+      notRunningHint: 'De printer heeft een droogtimer, maar het aftellen staat stil en de AMS meldt geen droogfase. De cyclus is nooit gestart of is gepauzeerd, bijvoorbeeld door de stroomlimiet of de lopende print.',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: 'Drogen niet ondersteund',
       powerRequired: 'Sluit de AMS-voedingsadapter aan om drogen in te schakelen',

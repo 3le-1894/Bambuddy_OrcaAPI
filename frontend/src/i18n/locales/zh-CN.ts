@@ -682,6 +682,8 @@ export default {
       hours: '小时',
       timeRemaining: '剩余 {{time}}',
       active: '干燥中',
+      notRunning: '干燥未在进行',
+      notRunningHint: '打印机设置了干燥计时器，但倒计时已停止，且 AMS 未报告任何干燥阶段。该周期从未启动，或因功率限制、当前打印等原因被暂停。',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: '不支持干燥',
       powerRequired: '连接AMS电源适配器以启用干燥',

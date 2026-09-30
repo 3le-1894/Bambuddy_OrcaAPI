@@ -681,6 +681,8 @@ export default {
       hours: '時間',
       timeRemaining: '残り {{time}}',
       active: '乾燥中',
+      notRunning: '乾燥は実行されていません',
+      notRunningHint: 'プリンターに乾燥タイマーが設定されていますが、カウントダウンが止まっており、AMSは乾燥フェーズを報告していません。サイクルが開始されなかったか、電力制限や進行中の印刷などにより一時停止しています。',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: '乾燥非対応',
       powerRequired: 'AMS電源アダプターを接続して乾燥を有効にしてください',

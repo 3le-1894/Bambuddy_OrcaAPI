@@ -682,6 +682,8 @@ export default {
       hours: 'saat',
       timeRemaining: '{{time}} kaldı',
       active: 'Kurutuluyor',
+      notRunning: 'Kurutma çalışmıyor',
+      notRunningHint: 'Yazıcıda bir kurutma zamanlayıcısı var, ancak geri sayım durdu ve AMS herhangi bir kurutma aşaması bildirmiyor. Döngü hiç başlamadı ya da örneğin güç sınırı veya devam eden baskı nedeniyle duraklatıldı.',
       targetSummary: '{{filament}} @ {{temp}}°C',
       notSupported: 'Kurutma desteklenmiyor',
       powerRequired: 'Kurutmayı etkinleştirmek için AMS güç adaptörünü bağlayın',
