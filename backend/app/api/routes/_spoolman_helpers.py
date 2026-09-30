@@ -144,6 +144,38 @@ def _safe_optional_float(value: object) -> float | None:
     return None
 
 
+# Used only when Spoolman has no empty-spool weight at any level.
+SPOOLMAN_FALLBACK_TARE = 250.0
+
+
+def spoolman_tare(spool: dict) -> tuple[float, str]:
+    """The empty-spool weight of a Spoolman spool, and where it came from.
+
+    Spoolman resolves the tare as the spool's own ``spool_weight``, then the
+    filament's ``spool_weight``, then the vendor's ``empty_spool_weight``, and
+    its own ``/measure`` endpoint follows that order. Skipping the vendor
+    level made a spool whose tare lives only on its vendor weigh against
+    250 g instead (#3195). Every Spoolman-mode tare in Bambuddy goes through
+    here so the weigh endpoints and the displayed core weight cannot drift
+    apart again.
+
+    Returns ``(grams, source)`` with source one of ``"spool"``,
+    ``"filament"``, ``"vendor"`` or ``"fallback"``. 0 is a real tare, not a
+    missing one; a value that is not a finite number counts as missing.
+    """
+    filament = spool.get("filament") or {}
+    vendor = filament.get("vendor") or {}
+    for source, raw in (
+        ("spool", spool.get("spool_weight")),
+        ("filament", filament.get("spool_weight")),
+        ("vendor", vendor.get("empty_spool_weight")),
+    ):
+        value = _safe_optional_float(raw)
+        if value is not None:
+            return value, source
+    return SPOOLMAN_FALLBACK_TARE, "fallback"
+
+
 def _extract_extra_str(extra: dict, key: str) -> str:
     """Extract a JSON-encoded string from a Spoolman extra dict.
 
@@ -380,11 +412,9 @@ def _map_spoolman_spool(spool: dict) -> MappedSpoolFields:
         "effect_type": None,
         "brand": vendor.get("name") or None,
         "label_weight": label_weight,
-        "core_weight": _safe_int(
-            spool.get("spool_weight") if spool.get("spool_weight") is not None else filament.get("spool_weight"), 250
-        ),
+        "core_weight": _safe_int(spoolman_tare(spool)[0], 250),
         # True when the spool has no spool_weight of its own and core_weight is
-        # the filament type's (or the 250 g fallback). The spool form needs it
+        # the filament type's, the vendor's or the 250 g fallback. The spool form needs it
         # to copy a spool without dropping an own tare or stamping an
         # inherited one (#2908).
         "core_weight_is_inherited": spool.get("spool_weight") is None,
