@@ -2211,11 +2211,10 @@ class TestAmbientDryingSustainedDelay(_DryingTestBase):
     @pytest.mark.asyncio
     @patch("backend.app.services.print_scheduler.printer_manager")
     async def test_mid_print_ambient_start_waits_like_any_ambient_start(self, mock_pm, scheduler):
-        """print_drying is a permission overlay, not a trigger: an ambient
-        start on a printer that happens to be printing is still an ambient
-        start and must serve the sustained wait. (The original exemption here
-        was disproven live — a 2-point threshold crossing mid-print bought a
-        parked 12h command instantly.)"""
+        """With ambient drying on, a humidity start on a printer that happens to
+        be printing must serve the sustained wait like one on an idle printer.
+        (The original exemption here was disproven live — a 2-point threshold
+        crossing mid-print bought a parked 12h command instantly.)"""
         state = self._state()
         state.state = "RUNNING"
         mock_pm.get_status.return_value = state
