@@ -26,10 +26,10 @@ from backend.app.api.routes._spoolman_helpers import (
     NormalizedFilament,
     NormalizedVendorRef,
     _map_spoolman_spool,
-    _safe_float,
     _safe_int,
     _safe_optional_float,
     assert_safe_spoolman_url,
+    spoolman_tare,
 )
 from backend.app.core.auth import RequirePermissionIfAuthEnabled
 from backend.app.core.database import get_db
@@ -1188,18 +1188,15 @@ async def sync_spool_weight(
 ) -> dict:
     """Update a spool's remaining weight from a measured gross weight.
 
-    Computes remaining = gross_weight - tare, where tare = spool.spool_weight
-    if set, else filament.spool_weight; falls back to 250 g when both unset.
+    Computes remaining = gross_weight - tare, with the tare resolved the way
+    Spoolman does it (spool, filament, vendor, then 250 g; see spoolman_tare).
     """
     client = await _get_client(db)
 
     async with _translate_spoolman_errors():
         current = await client.get_spool(spool_id)
 
-    cur_filament = current.get("filament") or {}
-    spool_tare = current.get("spool_weight")
-    raw_tare = spool_tare if spool_tare is not None else cur_filament.get("spool_weight")
-    core_weight = _safe_float(raw_tare, 250.0)
+    core_weight, _source = spoolman_tare(current)
     remaining = max(0.0, data.weight_grams - core_weight)
 
     async with _translate_spoolman_errors():
@@ -2061,7 +2058,8 @@ async def patch_spoolman_filament(
     """Update a Spoolman filament's name and/or spool_weight.
 
     When spool_weight changes, Option A (keep_existing_spools=True) stamps the old
-    weight onto spools currently inheriting it (spool.spool_weight is None) so their
+    weight (the filament's, or its vendor's empty_spool_weight when the filament had
+    none) onto spools currently inheriting it (spool.spool_weight is None) so their
     tare calculations are unaffected by the filament change.
     Option B (keep_existing_spools=False, the default): when spool_weight is a
     concrete value, stamps it onto every affected spool explicitly; when spool_weight
@@ -2089,7 +2087,13 @@ async def patch_spoolman_filament(
 
         if affected_spools:
             if body.keep_existing_spools:
+                # What the inheriting spools weigh against today: the filament's
+                # own value, or when it has none, its vendor's (#3195). With
+                # neither they sit on the 250 g fallback, which is Bambuddy's
+                # alone, so there is nothing real to keep.
                 old_weight = _safe_optional_float(current.get("spool_weight"))
+                if old_weight is None:
+                    old_weight = _safe_optional_float((current.get("vendor") or {}).get("empty_spool_weight"))
                 if old_weight is not None:
                     spools_to_fix = [s for s in affected_spools if s.get("spool_weight") is None]
                     if spools_to_fix:
@@ -2118,7 +2122,7 @@ async def patch_spoolman_filament(
                     _raise_if_partial_failure(affected_spools, results, "spool_weight stamp (option B)")
                 else:
                     # Filament weight is being cleared — remove any per-spool override
-                    # so spools fall back to whatever the filament now provides.
+                    # so spools fall back to the vendor's empty_spool_weight, or 250 g.
                     spools_to_clear = [s for s in affected_spools if s.get("spool_weight") is not None]
                     if spools_to_clear:
                         async with _translate_spoolman_errors():

@@ -8,6 +8,7 @@ from backend.app.api.routes._spoolman_helpers import (
     _map_spoolman_spool,
     _safe_float,
     _safe_int,
+    spoolman_tare,
 )
 
 # ---------------------------------------------------------------------------
@@ -465,6 +466,56 @@ class TestMapSpoolmanSpool:
     def test_both_levels_none_uses_fallback(self):
         spool = {**MINIMAL_SPOOL, "spool_weight": None, "filament": {**MINIMAL_SPOOL["filament"], "spool_weight": None}}
         assert _map_spoolman_spool(spool)["core_weight"] == 250
+
+    def test_core_weight_from_vendor_empty_spool_weight(self):
+        """Spoolman's third tare level is the vendor's empty_spool_weight (#3195)."""
+        spool = {
+            **MINIMAL_SPOOL,
+            "spool_weight": None,
+            "filament": {**MINIMAL_SPOOL["filament"], "spool_weight": None, "vendor": {"empty_spool_weight": 211.7}},
+        }
+        result = _map_spoolman_spool(spool)
+        assert result["core_weight"] == 211
+        # Still inherited: the spool has no tare of its own, so the form must not stamp it.
+        assert result["core_weight_is_inherited"] is True
+
+
+class TestSpoolmanTare:
+    """spoolman_tare resolves the tare the way Spoolman's /measure does (#3195)."""
+
+    @staticmethod
+    def _spool(spool_level=None, filament_level=None, vendor_level=None, vendor=True):
+        filament: dict = {"spool_weight": filament_level}
+        if vendor:
+            filament["vendor"] = {"id": 5, "name": "Sunlu", "empty_spool_weight": vendor_level}
+        return {"id": 1, "spool_weight": spool_level, "filament": filament}
+
+    @pytest.mark.parametrize(
+        ("levels", "expected"),
+        [
+            ((300.0, 180.0, 211.7), (300.0, "spool")),
+            ((None, 180.0, 211.7), (180.0, "filament")),
+            ((None, None, 211.7), (211.7, "vendor")),
+            ((None, None, None), (250.0, "fallback")),
+        ],
+    )
+    def test_resolution_order(self, levels, expected):
+        assert spoolman_tare(self._spool(*levels)) == expected
+
+    @pytest.mark.parametrize("level", ["spool", "filament", "vendor"])
+    def test_zero_is_a_real_tare_at_every_level(self, level):
+        levels = {"spool": (0, 180.0, 211.7), "filament": (None, 0, 211.7), "vendor": (None, None, 0)}[level]
+        assert spoolman_tare(self._spool(*levels)) == (0.0, level)
+
+    @pytest.mark.parametrize("bad", [float("nan"), float("inf"), "abc"])
+    def test_non_finite_value_counts_as_missing(self, bad):
+        assert spoolman_tare(self._spool(bad, None, 211.7)) == (211.7, "vendor")
+
+    def test_missing_vendor_null_vendor_and_null_filament(self):
+        assert spoolman_tare(self._spool(vendor=False)) == (250.0, "fallback")
+        assert spoolman_tare({"id": 1, "filament": {"vendor": None}}) == (250.0, "fallback")
+        assert spoolman_tare({"id": 1, "filament": None}) == (250.0, "fallback")
+        assert spoolman_tare({"id": 1}) == (250.0, "fallback")
 
 
 # ---------------------------------------------------------------------------
