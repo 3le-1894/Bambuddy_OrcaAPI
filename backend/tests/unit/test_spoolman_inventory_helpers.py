@@ -8,6 +8,9 @@ from backend.app.api.routes._spoolman_helpers import (
     _map_spoolman_spool,
     _safe_float,
     _safe_int,
+    cost_per_kg_to_spoolman_price,
+    spoolman_net_weight,
+    spoolman_price_to_cost_per_kg,
     spoolman_tare,
 )
 
@@ -683,3 +686,85 @@ class TestMapSpoolmanSpoolPrice:
 
         spool = {**MINIMAL_SPOOL, "price": math.inf}
         assert _map_spoolman_spool(spool)["cost_per_kg"] is None
+
+
+class TestSpoolmanNetWeight:
+    """The spool's initial_weight wins over the filament's weight, as in Spoolman (#3194)."""
+
+    @staticmethod
+    def _spool(initial=None, filament_weight=1000.0):
+        return {"id": 1, "initial_weight": initial, "filament": {"weight": filament_weight}}
+
+    def test_initial_weight_beats_filament_weight(self):
+        assert spoolman_net_weight(self._spool(250.0, 1000.0)) == 250.0
+
+    def test_falls_back_to_filament_weight(self):
+        assert spoolman_net_weight(self._spool(None, 1000.0)) == 1000.0
+
+    def test_zero_initial_weight_counts_as_unset(self):
+        """Spoolman's own /measure treats an initial_weight of 0 as missing."""
+        assert spoolman_net_weight(self._spool(0, 750.0)) == 750.0
+
+    @pytest.mark.parametrize("bad", [float("nan"), float("inf"), "abc", True])
+    def test_invalid_initial_weight_counts_as_unset(self, bad):
+        assert spoolman_net_weight(self._spool(bad, 750.0)) == 750.0
+
+    def test_filament_weight_returned_as_stored(self):
+        """A filament weight of 0 is left to the caller, which keeps its own handling."""
+        assert spoolman_net_weight(self._spool(None, 0)) == 0.0
+
+    @pytest.mark.parametrize("filament", [None, {}, "not a dict", {"weight": True}])
+    def test_nothing_usable_returns_none(self, filament):
+        assert spoolman_net_weight({"id": 1, "filament": filament}) is None
+
+
+class TestSpoolmanPriceConversion:
+    """A Spoolman spool price is the price of the whole spool (#3194)."""
+
+    def test_price_of_a_quarter_kilo_spool_as_a_rate(self):
+        assert spoolman_price_to_cost_per_kg(6.25, 250) == pytest.approx(25.0)
+
+    def test_rate_to_price_of_a_quarter_kilo_spool(self):
+        assert cost_per_kg_to_spoolman_price(25.0, 250) == pytest.approx(6.25)
+
+    def test_kilo_spool_price_equals_rate(self):
+        assert spoolman_price_to_cost_per_kg(24.99, 1000) == 24.99
+        assert cost_per_kg_to_spoolman_price(24.99, 1000) == 24.99
+
+    @pytest.mark.parametrize("weight", [250, 333, 750, 1000, 2500])
+    def test_round_trip_does_not_drift(self, weight):
+        price = cost_per_kg_to_spoolman_price(19.99, weight)
+        assert spoolman_price_to_cost_per_kg(price, weight) == pytest.approx(19.99, abs=1e-3)
+
+    @pytest.mark.parametrize(("price", "weight"), [(None, 1000), (math.nan, 1000), ("abc", 1000), (10.0, 0)])
+    def test_unusable_input_returns_none(self, price, weight):
+        assert spoolman_price_to_cost_per_kg(price, weight) is None
+
+
+class TestMapperUsesSpoolInitialWeight:
+    """#3194: a 250 g spool of a 1000 g filament maps as a 250 g spool."""
+
+    SPOOL = {
+        "id": 9,
+        "initial_weight": 250.0,
+        "remaining_weight": 200.0,
+        "used_weight": 50.0,
+        "price": 6.25,
+        "filament": {"id": 1, "material": "PLA", "name": "PLA Basic", "weight": 1000.0},
+        "extra": {},
+    }
+
+    def test_label_weight_is_the_spools(self):
+        mapped = _map_spoolman_spool(self.SPOOL)
+        assert mapped["label_weight"] == 250
+        # remaining = label - weight_used must match Spoolman's 200 g
+        assert mapped["label_weight"] - mapped["weight_used"] == pytest.approx(200.0)
+
+    def test_cost_per_kg_is_the_spool_price_over_its_weight(self):
+        assert _map_spoolman_spool(self.SPOOL)["cost_per_kg"] == pytest.approx(25.0)
+
+    def test_without_initial_weight_the_filament_weight_is_used(self):
+        spool = {**self.SPOOL, "initial_weight": None, "remaining_weight": 800.0, "used_weight": 200.0}
+        mapped = _map_spoolman_spool(spool)
+        assert mapped["label_weight"] == 1000
+        assert mapped["cost_per_kg"] == pytest.approx(6.25)
