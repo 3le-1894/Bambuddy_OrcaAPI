@@ -8915,6 +8915,9 @@ export function PrintersPage() {
     queryKey: ['ui-preferences'],
     queryFn: api.getUiPreferences,
   });
+  // Only once the preferences are in: deciding on `undefined` meant a check
+  // switched off still went out once per printer on every page load.
+  const firmwareChecksOn = settings !== undefined && settings.check_printer_firmware !== false;
 
   // Parse user-configured temperature/fan presets once, with defensive fallback
   // to built-in defaults on parse failure (validators on the backend already
@@ -9969,7 +9972,7 @@ export function PrintersPage() {
                       cameraViewMode={cameraViewMode}
                       onOpenEmbeddedCamera={(id, name) => setEmbeddedCameraPrinters(prev => new Map(prev).set(id, { id, name }))}
                       onSelectCameraViewMode={selectCameraViewMode}
-                      checkPrinterFirmware={settings?.check_printer_firmware !== false}
+                      checkPrinterFirmware={firmwareChecksOn}
                       dryingPresets={effectiveDryingPresets}
                       nozzleTempPresets={effectiveNozzleTempPresets}
                       bedTempPresets={effectiveBedTempPresets}
@@ -10022,7 +10025,7 @@ export function PrintersPage() {
               cameraViewMode={cameraViewMode}
               onOpenEmbeddedCamera={(id, name) => setEmbeddedCameraPrinters(prev => new Map(prev).set(id, { id, name }))}
               onSelectCameraViewMode={selectCameraViewMode}
-              checkPrinterFirmware={settings?.check_printer_firmware !== false}
+              checkPrinterFirmware={firmwareChecksOn}
               dryingPresets={effectiveDryingPresets}
               nozzleTempPresets={effectiveNozzleTempPresets}
               bedTempPresets={effectiveBedTempPresets}
