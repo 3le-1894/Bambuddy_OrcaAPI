@@ -616,7 +616,12 @@ async def list_queue(
             # Cross-model candidates (#671) and their files, for the card label.
             selectinload(PrintQueueItem.variants).selectinload(PrintQueueVariant.library_file),
         )
-        .order_by(PrintQueueItem.printer_id.nulls_first(), PrintQueueItem.position)
+        # The order the scheduler dispatches in (#3200), so the first pending
+        # item for a printer is the one it will start next -- which is what the
+        # printer card's "Next in queue" shows. Sorting by printer first put
+        # every "Any <model>" job (no printer_id) ahead of a job pinned to that
+        # printer, whatever their positions.
+        .order_by(PrintQueueItem.position, PrintQueueItem.id)
     )
     if user is not None and not can_read_all:
         query = query.where(PrintQueueItem.created_by_id == user.id)
