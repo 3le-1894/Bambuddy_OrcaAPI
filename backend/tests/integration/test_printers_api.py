@@ -1310,7 +1310,7 @@ class TestAMSRefreshAPI:
         printer = await printer_factory(name="Printer with AMS")
 
         mock_client = MagicMock()
-        mock_client.ams_refresh_tray.return_value = (True, "Refreshing AMS 0 tray 1")
+        mock_client.ams_refresh_tray = AsyncMock(return_value=(True, "Refreshing AMS 0 tray 1"))
 
         with patch("backend.app.api.routes.printers.printer_manager") as mock_pm:
             mock_pm.get_client.return_value = mock_client
@@ -1329,7 +1329,7 @@ class TestAMSRefreshAPI:
         printer = await printer_factory(name="Printer with AMS")
 
         mock_client = MagicMock()
-        mock_client.ams_refresh_tray.return_value = (False, "Please unload filament first")
+        mock_client.ams_refresh_tray = AsyncMock(return_value=(False, "Please unload filament first"))
 
         with patch("backend.app.api.routes.printers.printer_manager") as mock_pm:
             mock_pm.get_client.return_value = mock_client

@@ -399,6 +399,20 @@ def supports_nozzle_flow_type(model: str | None) -> bool:
     return normalized not in SINGLE_NOZZLE_FLOW_MODELS
 
 
+# Models whose firmware predates Bambu's newer MQTT protocol, so Bambu Studio
+# re-reads an AMS tag on them with the M620 R gcode rather than ams_get_rfid
+# (#3206). Short display names (uppercase, no spaces).
+LEGACY_RFID_REFRESH_MODELS = frozenset(["X1", "X1C", "X1E", "P1P", "P1S", "A1", "A1MINI"])
+
+
+def uses_legacy_rfid_refresh(model: str | None) -> bool:
+    """True for models that may need M620 R instead of ams_get_rfid (#3206)."""
+    if not model:
+        return False
+    short = PRINTER_MODEL_ID_MAP.get(model.strip(), model)
+    return short.strip().upper().replace(" ", "") in LEGACY_RFID_REFRESH_MODELS
+
+
 def get_rod_type(model: str | None) -> str | None:
     """Return the rod/rail type for a printer model.
 
