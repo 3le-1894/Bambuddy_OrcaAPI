@@ -385,7 +385,7 @@ export const handlers = [
 
   // Announcements from the maintainers: none by default.
   http.get('/api/v1/announcements', () => {
-    return HttpResponse.json([]);
+    return HttpResponse.json({ visible: true, announcements: [] });
   }),
 
   http.get('/api/v1/version', () => {

@@ -184,16 +184,35 @@ describe('Layout with announcements', () => {
     );
   });
 
-  it('shows no entry and no banner when there is nothing', async () => {
+  it('keeps the entry with nothing published, opening an empty list', async () => {
+    // The entry is where announcements live, not a notice that one arrived: it
+    // stays for whoever may see them, with no count and no banner.
+    render(<Layout />);
+    const entry = await screen.findByRole('button', { name: /announcements/i });
+    expect(within(entry).queryByText(/\d/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    fireEvent.click(entry);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('No announcements right now.')).toBeInTheDocument();
+  });
+
+  it('shows no entry for someone who may not see announcements', async () => {
+    server.use(
+      http.get('/api/v1/announcements', () => HttpResponse.json({ visible: false, announcements: [] }))
+    );
     render(<Layout />);
     await waitFor(() => expect(screen.getAllByTitle(/System/).length).toBeGreaterThan(0));
-    expect(screen.queryByText('Announcements')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /announcements/i })).not.toBeInTheDocument();
   });
 
   it('keeps the entry for history alone, with no count and no banner', async () => {
     server.use(
       http.get('/api/v1/announcements', () =>
-        HttpResponse.json([announcement({ id: 'old', level: 'critical', archived: true })])
+        HttpResponse.json({
+          visible: true,
+          announcements: [announcement({ id: 'old', level: 'critical', archived: true })],
+        })
       )
     );
     render(<Layout />);
@@ -206,10 +225,13 @@ describe('Layout with announcements', () => {
     let reads: string[] = [];
     server.use(
       http.get('/api/v1/announcements', () =>
-        HttpResponse.json([
-          announcement({ id: 'imp', level: 'important', texts: { en: { title: 'Breaking change in 2.0', body: 'b' } } }),
-          announcement({ id: 'inf', level: 'info', texts: { en: { title: 'Testers wanted', body: 'b' } } }),
-        ])
+        HttpResponse.json({
+          visible: true,
+          announcements: [
+            announcement({ id: 'imp', level: 'important', texts: { en: { title: 'Breaking change in 2.0', body: 'b' } } }),
+            announcement({ id: 'inf', level: 'info', texts: { en: { title: 'Testers wanted', body: 'b' } } }),
+          ],
+        })
       ),
       http.post('/api/v1/announcements/:id/read', ({ params }) => {
         reads = [...reads, String(params.id)];

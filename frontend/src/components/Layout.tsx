@@ -153,9 +153,15 @@ export function Layout() {
   });
 
   // Announcements from the Bambuddy maintainers: the sidebar entry above System,
-  // the slide-over list, and the banner for unread important/critical ones.
-  const { announcements, unread: unreadAnnouncements, bannerItems, markRead: markAnnouncementRead } =
-    useAnnouncements();
+  // the slide-over list, and the banner for unread important/critical ones. The
+  // entry is there for whoever may see announcements, also with none published.
+  const {
+    visible: announcementsVisible,
+    announcements,
+    unread: unreadAnnouncements,
+    bannerItems,
+    markRead: markAnnouncementRead,
+  } = useAnnouncements();
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   const [announcementFocus, setAnnouncementFocus] = useState<string | null>(null);
   const openAnnouncements = useCallback((focusId?: string) => {
@@ -769,7 +775,7 @@ export function Layout() {
                     )}
                   </div>
                 )}
-                {announcements.length > 0 && (
+                {announcementsVisible && (
                   <button
                     onClick={() => openAnnouncements()}
                     className="relative p-2 rounded-lg hover:bg-bambu-dark-tertiary transition-colors text-bambu-gray-light hover:text-white"
@@ -893,7 +899,7 @@ export function Layout() {
                   )}
                 </div>
               )}
-              {announcements.length > 0 && (
+              {announcementsVisible && (
                 <button
                   onClick={() => openAnnouncements()}
                   className="relative p-2 rounded-lg hover:bg-bambu-dark-tertiary transition-colors text-bambu-gray-light hover:text-white"

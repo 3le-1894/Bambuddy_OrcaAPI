@@ -9221,8 +9221,16 @@ export interface Announcement {
   read: boolean;
 }
 
+// `visible` says whether this user may see announcements at all (switched on,
+// and admin or "show to all users"); it keeps the sidebar entry while nothing
+// is published.
+export interface AnnouncementList {
+  visible: boolean;
+  announcements: Announcement[];
+}
+
 export const announcementsApi = {
-  list: () => request<Announcement[]>('/announcements'),
+  list: () => request<AnnouncementList>('/announcements'),
   markRead: (id: string) =>
     request<void>(`/announcements/${encodeURIComponent(id)}/read`, { method: 'POST' }),
 };
