@@ -21,27 +21,64 @@ function announcement(overrides: Partial<Announcement> = {}): Announcement {
     link_url: null,
     published_at: '2026-10-01T12:00:00Z',
     expires_at: null,
+    archived: false,
     read: false,
     ...overrides,
   };
 }
 
 describe('AnnouncementsPanel', () => {
-  it('marks what was unread as read on opening, and keeps a New chip on it', () => {
+  it('lists titles collapsed, marks unread ones New, and marks read only on opening one', () => {
     const markRead = vi.fn();
     render(
       <AnnouncementsPanel
         open
         onClose={() => {}}
         markRead={markRead}
-        announcements={[announcement(), announcement({ id: 'a2', read: true, texts: { en: { title: 'Old news', body: 'x' } } })]}
+        announcements={[
+          announcement({ texts: { en: { title: 'Fresh', body: 'Fresh body' } } }),
+          announcement({ id: 'a2', read: true, texts: { en: { title: 'Old news', body: 'Old body' } } }),
+        ]}
       />
     );
-    expect(markRead).toHaveBeenCalledTimes(1);
-    expect(markRead).toHaveBeenCalledWith('a1');
     const items = screen.getAllByRole('listitem');
     expect(within(items[0]).getByText('New')).toBeInTheDocument();
     expect(within(items[1]).queryByText('New')).not.toBeInTheDocument();
+    // Collapsed: titles only, nothing read yet.
+    expect(screen.queryByText('Fresh body')).not.toBeInTheDocument();
+    expect(markRead).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Fresh/ }));
+    expect(screen.getByText('Fresh body')).toBeInTheDocument();
+    expect(markRead).toHaveBeenCalledWith('a1');
+
+    // Opening one already read doesn't mark it again.
+    fireEvent.click(screen.getByRole('button', { name: /Old news/ }));
+    expect(screen.getByText('Old body')).toBeInTheDocument();
+    expect(markRead).toHaveBeenCalledTimes(1);
+
+    // And it closes again.
+    fireEvent.click(screen.getByRole('button', { name: /Fresh/ }));
+    expect(screen.queryByText('Fresh body')).not.toBeInTheDocument();
+  });
+
+  it('opens with the message the banner pointed at expanded', () => {
+    const markRead = vi.fn();
+    render(
+      <AnnouncementsPanel
+        open
+        focusId="b"
+        onClose={() => {}}
+        markRead={markRead}
+        announcements={[
+          announcement({ id: 'a', texts: { en: { title: 'A', body: 'A body' } } }),
+          announcement({ id: 'b', texts: { en: { title: 'B', body: 'B body' } } }),
+        ]}
+      />
+    );
+    expect(screen.getByText('B body')).toBeInTheDocument();
+    expect(screen.queryByText('A body')).not.toBeInTheDocument();
+    expect(markRead).toHaveBeenCalledWith('b');
   });
 
   it('renders the body as plain text, never as HTML', () => {
@@ -53,6 +90,7 @@ describe('AnnouncementsPanel', () => {
         announcements={[announcement({ texts: { en: { title: 'T', body: '<img src=x onerror=alert(1)>' } } })]}
       />
     );
+    fireEvent.click(screen.getByText('T'));
     expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
     expect(document.querySelector('img[src="x"]')).toBeNull();
   });
@@ -69,6 +107,8 @@ describe('AnnouncementsPanel', () => {
         ]}
       />
     );
+    fireEvent.click(screen.getByText('A'));
+    fireEvent.click(screen.getByText('B'));
     const link = screen.getByRole('link', { name: /Details/ });
     expect(link).toHaveAttribute('href', 'https://wiki.bambuddy.cool/x/');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
@@ -80,6 +120,29 @@ describe('AnnouncementsPanel', () => {
     render(<AnnouncementsPanel open onClose={onClose} markRead={() => {}} announcements={[announcement()]} />);
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe('AnnouncementsPanel history', () => {
+  it('lists expired messages under a collapsed Earlier section and never marks them', () => {
+    const markRead = vi.fn();
+    render(
+      <AnnouncementsPanel
+        open
+        onClose={() => {}}
+        markRead={markRead}
+        announcements={[
+          announcement({ id: 'old', archived: true, texts: { en: { title: 'Old news', body: 'x' } } }),
+        ]}
+      />
+    );
+    expect(screen.getByText('No announcements right now.')).toBeInTheDocument();
+    expect(screen.queryByText('Old news')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Earlier (1)' }));
+    expect(screen.getByText('Old news')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Old news/ }));
+    expect(screen.queryByText('New')).not.toBeInTheDocument();
+    expect(markRead).not.toHaveBeenCalled();
   });
 });
 
@@ -99,7 +162,7 @@ describe('AnnouncementBanner', () => {
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Update now');
     fireEvent.click(screen.getByRole('button', { name: 'Read more (+1)' }));
-    expect(onOpen).toHaveBeenCalled();
+    expect(onOpen).toHaveBeenCalledWith('crit');
     fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
     expect(markRead).toHaveBeenCalledWith('crit');
   });
@@ -127,6 +190,18 @@ describe('Layout with announcements', () => {
     expect(screen.queryByText('Announcements')).not.toBeInTheDocument();
   });
 
+  it('keeps the entry for history alone, with no count and no banner', async () => {
+    server.use(
+      http.get('/api/v1/announcements', () =>
+        HttpResponse.json([announcement({ id: 'old', level: 'critical', archived: true })])
+      )
+    );
+    render(<Layout />);
+    const entry = await screen.findByRole('button', { name: /announcements/i });
+    expect(within(entry).queryByText('1')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('shows the entry with an unread count, the banner for important, and opens the list', async () => {
     let reads: string[] = [];
     server.use(
@@ -143,7 +218,7 @@ describe('Layout with announcements', () => {
     );
     render(<Layout />);
 
-    const entry = await screen.findByRole('button', { name: /Announcements/ });
+    const entry = await screen.findByRole('button', { name: /announcements/i });
     expect(within(entry).getByText('2')).toBeInTheDocument();
     // Only the important one earns a banner.
     expect(screen.getByRole('status')).toHaveTextContent('Breaking change in 2.0');
@@ -152,8 +227,12 @@ describe('Layout with announcements', () => {
     fireEvent.click(entry);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Testers wanted')).toBeInTheDocument();
-    await waitFor(() => expect(reads.sort()).toEqual(['imp', 'inf']));
-    // Read now: the banner is gone.
+    // Opening the panel reads nothing; opening a message reads that one.
+    expect(reads).toEqual([]);
+    fireEvent.click(within(dialog).getByRole('button', { name: /Breaking change in 2.0/ }));
+    await waitFor(() => expect(reads).toEqual(['imp']));
+    // Read now: its banner is gone, the info one is still unread.
     await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+    expect(within(dialog).getAllByText('New')).toHaveLength(1);
   });
 });

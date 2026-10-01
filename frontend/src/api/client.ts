@@ -9216,6 +9216,8 @@ export interface Announcement {
   link_url: string | null;
   published_at: string | null;
   expires_at: string | null;
+  // Past its expiry: kept as history, listed under "Earlier", never unread.
+  archived: boolean;
   read: boolean;
 }
 

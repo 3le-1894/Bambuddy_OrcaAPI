@@ -37,6 +37,7 @@ export default {
     title: 'Annonces',
     unread: 'Annonces non lues : {{count}}',
     empty: 'Aucune annonce pour le moment.',
+    earlier: 'Précédentes ({{count}})',
     new: 'Nouveau',
     readMore: 'En savoir plus',
     readMoreCount: 'En savoir plus (+{{count}})',

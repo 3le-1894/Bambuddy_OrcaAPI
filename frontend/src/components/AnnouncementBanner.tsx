@@ -6,7 +6,8 @@ import { announcementText } from '../hooks/useAnnouncements';
 interface AnnouncementBannerProps {
   // Unread important/critical announcements, most severe first.
   items: Announcement[];
-  onOpen: () => void;
+  // Opens the panel with this message expanded.
+  onOpen: (id: string) => void;
   markRead: (id: string) => void;
 }
 
@@ -40,7 +41,7 @@ export function AnnouncementBanner({ items, onOpen, markRead }: AnnouncementBann
           {text.title}
         </span>
         <button
-          onClick={onOpen}
+          onClick={() => onOpen(first.id)}
           className={`font-medium underline ${
             critical
               ? 'text-red-700 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300'

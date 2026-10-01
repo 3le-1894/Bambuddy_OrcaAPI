@@ -37,6 +37,7 @@ export default {
     title: 'Announcements',
     unread: 'Unread announcements: {{count}}',
     empty: 'No announcements right now.',
+    earlier: 'Earlier ({{count}})',
     new: 'New',
     readMore: 'Read more',
     readMoreCount: 'Read more (+{{count}})',

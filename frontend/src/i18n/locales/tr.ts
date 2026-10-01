@@ -37,6 +37,7 @@ export default {
     title: 'Duyurular',
     unread: 'Okunmamış duyurular: {{count}}',
     empty: 'Şu anda duyuru yok.',
+    earlier: 'Önceki ({{count}})',
     new: 'Yeni',
     readMore: 'Devamını oku',
     readMoreCount: 'Devamını oku (+{{count}})',

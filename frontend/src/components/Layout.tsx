@@ -157,8 +157,10 @@ export function Layout() {
   const { announcements, unread: unreadAnnouncements, bannerItems, markRead: markAnnouncementRead } =
     useAnnouncements();
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
-  const openAnnouncements = useCallback(() => {
+  const [announcementFocus, setAnnouncementFocus] = useState<string | null>(null);
+  const openAnnouncements = useCallback((focusId?: string) => {
     setMobileDrawerOpen(false);
+    setAnnouncementFocus(focusId ?? null);
     setAnnouncementsOpen(true);
   }, []);
   const closeAnnouncements = useCallback(() => setAnnouncementsOpen(false), []);
@@ -746,29 +748,11 @@ export function Layout() {
         {/* Footer */}
         <div className="flex-shrink-0 p-2 border-t border-bambu-dark-tertiary">
           {isSidebarCompact || sidebarExpanded ? (
-            <div className="flex flex-col gap-2 px-2">
-              {/* Announcements: a row of its own above the icons, so it isn't one
-                  more glyph in a row people have stopped reading. Only while
-                  there is something to show. */}
-              {announcements.length > 0 && (
-                <button
-                  onClick={openAnnouncements}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-bambu-dark-tertiary transition-colors text-bambu-gray-light hover:text-white text-sm"
-                >
-                  <Megaphone className="w-5 h-5 flex-shrink-0" />
-                  <span>{t('announcements.title')}</span>
-                  {unreadAnnouncements.length > 0 && (
-                    <span
-                      className="ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[11px] font-bold rounded-full bg-bambu-green text-white"
-                      aria-label={t('announcements.unread', { count: unreadAnnouncements.length })}
-                    >
-                      {unreadAnnouncements.length}
-                    </span>
-                  )}
-                </button>
-              )}
-              {/* Top row: icons */}
-              <div className="flex items-center justify-center gap-1 flex-wrap">
+            <div className="flex flex-col gap-2">
+              {/* Top row: icons. 32px each with no gap so seven fit the 239px
+                  of an expanded sidebar -- announcements, System, GitHub,
+                  shortcuts, theme, password, logout -- without wrapping. */}
+              <div className="flex items-center justify-center flex-wrap [&>a]:p-1.5 [&>button]:p-1.5 [&>span]:p-1.5 [&>div>button]:p-1.5">
                 {hasSwitchbarPlugs && (
                   <div className="relative">
                     <button
@@ -784,6 +768,25 @@ export function Layout() {
                       <SwitchbarPopover onClose={() => setShowSwitchbar(false)} />
                     )}
                   </div>
+                )}
+                {announcements.length > 0 && (
+                  <button
+                    onClick={() => openAnnouncements()}
+                    className="relative p-2 rounded-lg hover:bg-bambu-dark-tertiary transition-colors text-bambu-gray-light hover:text-white"
+                    title={t('announcements.title')}
+                    aria-label={
+                      unreadAnnouncements.length > 0
+                        ? t('announcements.unread', { count: unreadAnnouncements.length })
+                        : t('announcements.title')
+                    }
+                  >
+                    <Megaphone className="w-5 h-5" />
+                    {unreadAnnouncements.length > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-bold rounded-full bg-bambu-green text-white">
+                        {unreadAnnouncements.length}
+                      </span>
+                    )}
+                  </button>
                 )}
                 {hasPermission('system:read') ? (
                   <NavLink
@@ -892,7 +895,7 @@ export function Layout() {
               )}
               {announcements.length > 0 && (
                 <button
-                  onClick={openAnnouncements}
+                  onClick={() => openAnnouncements()}
                   className="relative p-2 rounded-lg hover:bg-bambu-dark-tertiary transition-colors text-bambu-gray-light hover:text-white"
                   title={t('announcements.title')}
                   aria-label={
@@ -1065,6 +1068,7 @@ export function Layout() {
         onClose={closeAnnouncements}
         announcements={announcements}
         markRead={markAnnouncementRead}
+        focusId={announcementFocus}
       />
 
       <UnknownSpoolModal

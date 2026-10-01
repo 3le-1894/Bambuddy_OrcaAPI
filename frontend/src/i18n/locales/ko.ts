@@ -34,6 +34,7 @@ export default {
     title: '공지사항',
     unread: '읽지 않은 공지사항: {{count}}',
     empty: '현재 공지사항이 없습니다.',
+    earlier: '이전 공지 ({{count}})',
     new: '새 소식',
     readMore: '자세히 보기',
     readMoreCount: '자세히 보기 (+{{count}})',

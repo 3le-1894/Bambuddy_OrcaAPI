@@ -3,7 +3,7 @@ import { announcementText, isAllowedAnnouncementLink } from '../../hooks/useAnno
 import type { Announcement } from '../../api/client';
 
 const a = (texts: Announcement['texts']): Announcement => ({
-  id: 'x', level: 'info', texts, link_url: null, published_at: null, expires_at: null, read: false,
+  id: 'x', level: 'info', texts, link_url: null, published_at: null, expires_at: null, archived: false, read: false,
 });
 
 describe('announcementText', () => {

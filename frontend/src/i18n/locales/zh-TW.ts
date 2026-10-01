@@ -37,6 +37,7 @@ export default {
     title: '公告',
     unread: '未讀公告：{{count}}',
     empty: '目前沒有公告。',
+    earlier: '更早 ({{count}})',
     new: '新',
     readMore: '了解更多',
     readMoreCount: '了解更多 (+{{count}})',

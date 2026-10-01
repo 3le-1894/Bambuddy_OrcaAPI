@@ -37,6 +37,7 @@ export default {
     title: 'Aankondigingen',
     unread: 'Ongelezen aankondigingen: {{count}}',
     empty: 'Op dit moment geen aankondigingen.',
+    earlier: 'Eerder ({{count}})',
     new: 'Nieuw',
     readMore: 'Meer lezen',
     readMoreCount: 'Meer lezen (+{{count}})',
