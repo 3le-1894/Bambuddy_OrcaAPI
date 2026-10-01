@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { screen, waitFor, render as rtlRender } from '@testing-library/react';
+import { act, screen, waitFor, render as rtlRender } from '@testing-library/react';
 import { StreamOverlayPage } from '../../pages/StreamOverlayPage';
 import { http, HttpResponse } from 'msw';
 import { server } from '../mocks/server';
@@ -104,6 +104,32 @@ describe('StreamOverlayPage', () => {
   afterEach(() => {
     document.title = originalTitle;
     vi.unstubAllGlobals();
+  });
+
+  it.each(['', '&artwork=2'])('reconnects the kiosk camera without changing its token or settings (%s)', async (artwork) => {
+    server.use(http.get('/api/v1/printers/:id/overlay-status', () => HttpResponse.json({
+      ...mockStatusIdle, camera_rotation: 90,
+    })));
+    const timers = vi.spyOn(globalThis, 'setTimeout');
+    const view = renderOverlayPage(1, `?token=overlay-test&fps=7${artwork}`);
+    try {
+      const image = await screen.findByAltText('Camera stream');
+      const source = image.getAttribute('src');
+      expect(source).toContain('token=overlay-test');
+      const renewal = timers.mock.calls.find(([, delay]) => delay === 60_000)?.[0];
+      expect(renewal).toBeTypeOf('function');
+      if (typeof renewal !== 'function') throw new Error('Missing camera renewal timer');
+      act(() => renewal());
+      const renewed = screen.getByAltText('Camera stream');
+      expect(renewed).not.toBe(image);
+      expect(renewed.getAttribute('src')).not.toBe(source);
+      expect(renewed.getAttribute('src')).toContain('token=overlay-test');
+      expect(renewed.getAttribute('src')).toContain('fps=7');
+      expect(renewed.style.transform).toBe(artwork ? 'translate(-50%, -50%) rotate(90deg)' : 'rotate(90deg)');
+    } finally {
+      view.unmount();
+      timers.mockRestore();
+    }
   });
 
   describe('updated artwork', () => {
