@@ -33,6 +33,21 @@ export default {
   },
 
   // Common
+  announcements: {
+    title: 'Aankondigingen',
+    unread: 'Ongelezen aankondigingen: {{count}}',
+    empty: 'Op dit moment geen aankondigingen.',
+    new: 'Nieuw',
+    readMore: 'Meer lezen',
+    readMoreCount: 'Meer lezen (+{{count}})',
+    gotIt: 'Begrepen',
+    source: 'Van de Bambuddy-ontwikkelaars, opgehaald van GitHub. Je kunt ze uitzetten in de instellingen.',
+    level: {
+      info: 'Mededeling',
+      important: 'Belangrijk',
+      critical: 'Kritiek',
+    },
+  },
   common: {
     plusNMore: '+{{count}} meer',
     save: 'Opslaan',
@@ -2224,6 +2239,11 @@ export default {
     checkPrinterFirmware: 'Printerfirmware controleren',
     includeBetaUpdates: 'Bètaversies opnemen',
     includeBetaUpdatesDesc: 'Melden over bèta- en prereleaseversies bij controle op updates',
+    announcementsEnabled: 'Aankondigingen ontvangen',
+    announcementsEnabledDesc: 'Berichten van de Bambuddy-ontwikkelaars, zoals beveiligingsfixes en incompatibele wijzigingen. Bambuddy haalt om de paar uur een ondertekend bestand op van GitHub; er wordt niets over deze installatie verstuurd.',
+    announcementsLearnMore: 'Meer informatie',
+    announcementsAllUsers: 'Tonen aan alle gebruikers',
+    announcementsAllUsersDesc: 'Uit: alleen beheerders zien ze. Heeft geen effect zolang authenticatie uit staat.',
     localLogin: {
       disable: 'Lokale login met gebruikersnaam/wachtwoord uitschakelen',
       disableHint: 'Wanneer ingeschakeld kunnen alleen SSO-providers inloggen. LDAP blijft onaangetast. Stel BAMBUDDY_LOCAL_LOGIN=true in op de server om een herstelmogelijkheid te behouden.',

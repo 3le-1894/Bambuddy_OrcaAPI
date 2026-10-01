@@ -20,6 +20,7 @@ from sqlalchemy import delete, or_, select, text
 
 from backend.app.api.routes import (
     ams_history,
+    announcements,
     api_keys,
     archive_purge,
     archives,
@@ -9978,6 +9979,11 @@ async def lifespan(app: FastAPI):
     # L-2: Start periodic auth cleanup (stale TOTP + expired revoked JTIs)
     start_auth_cleanup()
 
+    # Maintainer announcements: a signed feed fetched from GitHub every few hours.
+    from backend.app.services import announcements as announcements_service
+
+    announcements_service.start()
+
     from backend.app.services.printer_media import start_printer_download_cleanup
 
     start_printer_download_cleanup()
@@ -10032,6 +10038,9 @@ async def lifespan(app: FastAPI):
         logging.warning("Failed to shut down camera broadcasters: %s", e)
     stop_expected_prints_cleanup()
     stop_auth_cleanup()
+    from backend.app.services import announcements as announcements_service
+
+    announcements_service.stop()
     from backend.app.services.printer_media import stop_printer_download_cleanup
 
     await stop_printer_download_cleanup()
@@ -10586,6 +10595,7 @@ app.include_router(spoolman.router, prefix=app_settings.api_prefix)
 app.include_router(spoolman_inventory.router, prefix=app_settings.api_prefix)
 app.include_router(updates.router, prefix=app_settings.api_prefix)
 app.include_router(sponsor_prompt.router, prefix=app_settings.api_prefix)
+app.include_router(announcements.router, prefix=app_settings.api_prefix)
 app.include_router(maintenance.router, prefix=app_settings.api_prefix)
 app.include_router(camera.router, prefix=app_settings.api_prefix)
 app.include_router(camwall.router, prefix=app_settings.api_prefix)

@@ -33,6 +33,21 @@ export default {
   },
 
   // Common
+  announcements: {
+    title: 'Annunci',
+    unread: 'Annunci non letti: {{count}}',
+    empty: 'Nessun annuncio al momento.',
+    new: 'Nuovo',
+    readMore: 'Scopri di più',
+    readMoreCount: 'Scopri di più (+{{count}})',
+    gotIt: 'Ho capito',
+    source: 'Dagli sviluppatori di Bambuddy, scaricati da GitHub. Puoi disattivarli nelle impostazioni.',
+    level: {
+      info: 'Informazione',
+      important: 'Importante',
+      critical: 'Critico',
+    },
+  },
   common: {
     plusNMore: '+{{count}} altri',
     save: 'Salva',
@@ -2159,6 +2174,11 @@ export default {
     checkPrinterFirmware: 'Controlla firmware stampante',
     includeBetaUpdates: 'Includi versioni beta',
     includeBetaUpdatesDesc: 'Notifica versioni beta e prerelease durante il controllo aggiornamenti',
+    announcementsEnabled: 'Ricevi annunci',
+    announcementsEnabledDesc: 'Messaggi degli sviluppatori di Bambuddy, come correzioni di sicurezza e modifiche incompatibili. Bambuddy scarica un file firmato da GitHub ogni poche ore; nulla su questa installazione viene inviato.',
+    announcementsLearnMore: 'Ulteriori informazioni',
+    announcementsAllUsers: 'Mostra a tutti gli utenti',
+    announcementsAllUsersDesc: "Disattivato: li vedono solo gli amministratori. Nessun effetto finché l'autenticazione è disattivata.",
     localLogin: {
       disable: 'Disabilita l\'accesso locale con nome utente/password',
       disableHint: 'Quando attivato, solo i provider SSO possono accedere. LDAP non è interessato. Imposta BAMBUDDY_LOCAL_LOGIN=true sul server per mantenere un percorso di ripristino.',

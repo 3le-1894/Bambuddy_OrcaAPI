@@ -33,6 +33,21 @@ export default {
   },
 
   // Common
+  announcements: {
+    title: 'Ankündigungen',
+    unread: 'Ungelesene Ankündigungen: {{count}}',
+    empty: 'Derzeit keine Ankündigungen.',
+    new: 'Neu',
+    readMore: 'Mehr erfahren',
+    readMoreCount: 'Mehr erfahren (+{{count}})',
+    gotIt: 'Verstanden',
+    source: 'Von den Bambuddy-Entwicklern, abgerufen von GitHub. Du kannst sie in den Einstellungen abschalten.',
+    level: {
+      info: 'Hinweis',
+      important: 'Wichtig',
+      critical: 'Kritisch',
+    },
+  },
   common: {
     plusNMore: '+{{count}} weitere',
     save: 'Speichern',
@@ -2204,6 +2219,11 @@ export default {
     checkPrinterFirmware: 'Drucker-Firmware prüfen',
     includeBetaUpdates: 'Beta-Versionen einschließen',
     includeBetaUpdatesDesc: 'Über Beta- und Vorabversionen bei der Updateprüfung benachrichtigen',
+    announcementsEnabled: 'Ankündigungen empfangen',
+    announcementsEnabledDesc: 'Nachrichten der Bambuddy-Entwickler, etwa zu Sicherheitskorrekturen und inkompatiblen Änderungen. Bambuddy lädt alle paar Stunden eine signierte Datei von GitHub; über diese Installation wird nichts gesendet.',
+    announcementsLearnMore: 'Mehr dazu',
+    announcementsAllUsers: 'Allen Benutzern anzeigen',
+    announcementsAllUsersDesc: 'Aus: Nur Administratoren sehen sie. Ohne Wirkung, solange die Authentifizierung aus ist.',
     localLogin: {
       disable: 'Lokale Benutzername-/Passwort-Anmeldung deaktivieren',
       disableHint: 'Wenn aktiviert, ist nur die Anmeldung über SSO möglich. LDAP ist davon nicht betroffen. Setzen Sie BAMBUDDY_LOCAL_LOGIN=true auf dem Server, um einen Wiederherstellungsweg offen zu halten.',

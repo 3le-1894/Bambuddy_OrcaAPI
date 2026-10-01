@@ -33,6 +33,21 @@ export default {
   },
 
   // Common
+  announcements: {
+    title: '公告',
+    unread: '未讀公告：{{count}}',
+    empty: '目前沒有公告。',
+    new: '新',
+    readMore: '了解更多',
+    readMoreCount: '了解更多 (+{{count}})',
+    gotIt: '知道了',
+    source: '來自 Bambuddy 開發者，從 GitHub 取得。可在設定中關閉。',
+    level: {
+      info: '資訊',
+      important: '重要',
+      critical: '緊急',
+    },
+  },
   common: {
     plusNMore: '另 {{count}} 個',
     save: '儲存',
@@ -2204,6 +2219,11 @@ export default {
     checkPrinterFirmware: '檢查印表機韌體',
     includeBetaUpdates: '包含測試版本',
     includeBetaUpdatesDesc: '檢查更新時通知測試版和預發布版本',
+    announcementsEnabled: '接收公告',
+    announcementsEnabledDesc: '來自 Bambuddy 開發者的訊息，例如安全性修正和不相容的變更。Bambuddy 每隔幾小時從 GitHub 取得一個已簽署的檔案；不會傳送有關此安裝的任何資訊。',
+    announcementsLearnMore: '了解更多',
+    announcementsAllUsers: '向所有使用者顯示',
+    announcementsAllUsersDesc: '關閉：僅管理員可見。驗證關閉時無效。',
     localLogin: {
       disable: '停用本機使用者名稱／密碼登入',
       disableHint: '啟用後，只能透過SSO提供者登入。LDAP不受影響。在伺服器上設定 BAMBUDDY_LOCAL_LOGIN=true 可保留復原途徑。',

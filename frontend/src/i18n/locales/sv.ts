@@ -33,6 +33,21 @@ export default {
   },
 
   // Common
+  announcements: {
+    title: 'Meddelanden',
+    unread: 'Olästa meddelanden: {{count}}',
+    empty: 'Inga meddelanden just nu.',
+    new: 'Ny',
+    readMore: 'Läs mer',
+    readMoreCount: 'Läs mer (+{{count}})',
+    gotIt: 'Uppfattat',
+    source: 'Från Bambuddys utvecklare, hämtade från GitHub. Du kan stänga av dem i inställningarna.',
+    level: {
+      info: 'Information',
+      important: 'Viktigt',
+      critical: 'Kritiskt',
+    },
+  },
   common: {
     plusNMore: '+{{count}} till',
     save: 'Spara',
@@ -2223,6 +2238,11 @@ export default {
     checkPrinterFirmware: 'Kontrollera skrivarens firmware',
     includeBetaUpdates: 'Inkludera betaversioner',
     includeBetaUpdatesDesc: 'Notis om betaversioner och förhandsversioner vid sökning av uppdateringar',
+    announcementsEnabled: 'Ta emot meddelanden',
+    announcementsEnabledDesc: 'Meddelanden från Bambuddys utvecklare, till exempel säkerhetsrättningar och inkompatibla ändringar. Bambuddy hämtar en signerad fil från GitHub med några timmars mellanrum; ingenting om den här installationen skickas.',
+    announcementsLearnMore: 'Läs mer',
+    announcementsAllUsers: 'Visa för alla användare',
+    announcementsAllUsersDesc: 'Av: endast administratörer ser dem. Ingen effekt så länge autentisering är avstängd.',
     localLogin: {
       disable: 'Inaktivera lokal användarnamn/lösenordsinloggning',
       disableHint: 'När aktiverat kan endast SSO-leverantörer logga in. LDAP påverkas inte. Sätt BAMBUDDY_LOCAL_LOGIN=true på servern för att behålla en återställningsväg.',

@@ -1383,6 +1383,9 @@ export interface AppSettings {
   check_updates: boolean;
   check_printer_firmware: boolean;
   include_beta_updates: boolean;
+  // Announcements from the Bambuddy maintainers (a signed file on GitHub).
+  announcements_enabled?: boolean;
+  announcements_all_users?: boolean;
   // #1589: false hides the local username/password form on the login page;
   // BAMBUDDY_LOCAL_LOGIN=true on the server flips the reported value back to
   // true so the env-var recovery path is visible to the SPA.
@@ -9194,6 +9197,32 @@ export const bugReportApi = {
     request<{ logs: string }>(`/bug-report/stop-logging?was_debug=${wasDebug}`, {
       method: 'POST',
     }),
+};
+
+export type AnnouncementLevel = 'info' | 'important' | 'critical';
+
+export interface AnnouncementText {
+  title: string;
+  body: string;
+  link_label?: string;
+}
+
+// One message from the Bambuddy maintainers. `texts` holds every language the
+// message was written in; English is always there.
+export interface Announcement {
+  id: string;
+  level: AnnouncementLevel;
+  texts: Record<string, AnnouncementText>;
+  link_url: string | null;
+  published_at: string | null;
+  expires_at: string | null;
+  read: boolean;
+}
+
+export const announcementsApi = {
+  list: () => request<Announcement[]>('/announcements'),
+  markRead: (id: string) =>
+    request<void>(`/announcements/${encodeURIComponent(id)}/read`, { method: 'POST' }),
 };
 
 export interface SponsorPromptCheckResponse {

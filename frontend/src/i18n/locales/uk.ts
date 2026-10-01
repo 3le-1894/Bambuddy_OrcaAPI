@@ -33,6 +33,21 @@ export default {
   },
 
   // Common
+  announcements: {
+    title: 'Оголошення',
+    unread: 'Непрочитані оголошення: {{count}}',
+    empty: 'Наразі оголошень немає.',
+    new: 'Нове',
+    readMore: 'Докладніше',
+    readMoreCount: 'Докладніше (+{{count}})',
+    gotIt: 'Зрозуміло',
+    source: 'Від розробників Bambuddy, завантажуються з GitHub. Їх можна вимкнути в налаштуваннях.',
+    level: {
+      info: 'Інформація',
+      important: 'Важливо',
+      critical: 'Критично',
+    },
+  },
   common: {
     plusNMore: 'ще {{count}}',
     save: "Зберегти",
@@ -2222,6 +2237,11 @@ export default {
     checkPrinterFirmware: "Перевірити прошивку принтера",
     includeBetaUpdates: "Включати бета-версії",
     includeBetaUpdatesDesc: "Повідомляти про бета-версії та попередні версії під час перевірки оновлень",
+    announcementsEnabled: 'Отримувати оголошення',
+    announcementsEnabledDesc: 'Повідомлення від розробників Bambuddy, наприклад про виправлення безпеки та несумісні зміни. Bambuddy раз на кілька годин завантажує підписаний файл із GitHub; жодних даних про цю інсталяцію не надсилається.',
+    announcementsLearnMore: 'Докладніше',
+    announcementsAllUsers: 'Показувати всім користувачам',
+    announcementsAllUsersDesc: 'Вимк.: бачать лише адміністратори. Не діє, поки автентифікацію вимкнено.',
     localLogin: {
       disable: "Вимкнути локальний вхід за іменем користувача й паролем",
       disableHint: "Якщо ввімкнено, увійти можна буде лише через постачальників SSO. На LDAP це не впливає. Щоб зберегти резервний спосіб входу, установіть на сервері BAMBUDDY_LOCAL_LOGIN=true.",

@@ -33,6 +33,21 @@ export default {
   },
 
   // Common
+  announcements: {
+    title: 'お知らせ',
+    unread: '未読のお知らせ: {{count}}',
+    empty: '現在お知らせはありません。',
+    new: '新着',
+    readMore: '詳細を見る',
+    readMoreCount: '詳細を見る (+{{count}})',
+    gotIt: '了解',
+    source: 'Bambuddy 開発者からのお知らせです（GitHub から取得）。設定でオフにできます。',
+    level: {
+      info: '情報',
+      important: '重要',
+      critical: '緊急',
+    },
+  },
   common: {
     plusNMore: '他{{count}}件',
     save: '保存',
@@ -2203,6 +2218,11 @@ export default {
     checkPrinterFirmware: 'プリンターファームウェアの確認',
     includeBetaUpdates: 'ベータ版を含める',
     includeBetaUpdatesDesc: 'アップデート確認時にベータ版およびプレリリース版を通知する',
+    announcementsEnabled: 'お知らせを受け取る',
+    announcementsEnabledDesc: 'セキュリティ修正や互換性のない変更など、Bambuddy 開発者からのメッセージです。Bambuddy は数時間ごとに GitHub から署名付きファイルを取得します。このインストールに関する情報は一切送信されません。',
+    announcementsLearnMore: '詳細',
+    announcementsAllUsers: 'すべてのユーザーに表示',
+    announcementsAllUsersDesc: 'オフ: 管理者のみに表示されます。認証がオフの間は効果がありません。',
     localLogin: {
       disable: 'ローカルのユーザー名／パスワードログインを無効化',
       disableHint: '有効にすると、SSOプロバイダーのみでサインインできます。LDAPには影響しません。復旧用のパスを残すには、サーバーで BAMBUDDY_LOCAL_LOGIN=true を設定してください。',

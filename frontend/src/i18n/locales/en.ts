@@ -33,6 +33,21 @@ export default {
   },
 
   // Common
+  announcements: {
+    title: 'Announcements',
+    unread: 'Unread announcements: {{count}}',
+    empty: 'No announcements right now.',
+    new: 'New',
+    readMore: 'Read more',
+    readMoreCount: 'Read more (+{{count}})',
+    gotIt: 'Got it',
+    source: 'From the Bambuddy maintainers, fetched from GitHub. You can turn them off in Settings.',
+    level: {
+      info: 'Info',
+      important: 'Important',
+      critical: 'Critical',
+    },
+  },
   common: {
     plusNMore: '+{{count}} more',
     save: 'Save',
@@ -2224,6 +2239,11 @@ export default {
     checkPrinterFirmware: 'Check printer firmware',
     includeBetaUpdates: 'Include beta versions',
     includeBetaUpdatesDesc: 'Notify about beta and prerelease versions when checking for updates',
+    announcementsEnabled: 'Receive announcements',
+    announcementsEnabledDesc: 'Messages from the Bambuddy maintainers, such as security fixes and breaking changes. Bambuddy fetches a signed file from GitHub every few hours; nothing about this install is sent.',
+    announcementsLearnMore: 'Learn more',
+    announcementsAllUsers: 'Show to all users',
+    announcementsAllUsersDesc: 'Off: only administrators see them. Has no effect while authentication is off.',
     localLogin: {
       disable: 'Disable local username/password login',
       disableHint: 'When enabled, only SSO providers can sign in. LDAP is unaffected. Set BAMBUDDY_LOCAL_LOGIN=true on the server to keep a recovery path.',
