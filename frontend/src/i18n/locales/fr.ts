@@ -33,6 +33,21 @@ export default {
   },
 
   // Common
+  announcements: {
+    title: 'Annonces',
+    unread: 'Annonces non lues : {{count}}',
+    empty: 'Aucune annonce pour le moment.',
+    new: 'Nouveau',
+    readMore: 'En savoir plus',
+    readMoreCount: 'En savoir plus (+{{count}})',
+    gotIt: 'Compris',
+    source: 'Des développeurs de Bambuddy, récupérées depuis GitHub. Vous pouvez les désactiver dans les paramètres.',
+    level: {
+      info: 'Information',
+      important: 'Importante',
+      critical: 'Critique',
+    },
+  },
   common: {
     plusNMore: '+{{count}} autres',
     save: 'Enregistrer',
@@ -2159,6 +2174,11 @@ export default {
     checkPrinterFirmware: 'Vérifier le firmware imprimante',
     includeBetaUpdates: 'Inclure les versions bêta',
     includeBetaUpdatesDesc: 'Notifier des versions bêta et préliminaires lors de la vérification des mises à jour',
+    announcementsEnabled: 'Recevoir les annonces',
+    announcementsEnabledDesc: "Messages des développeurs de Bambuddy, comme les correctifs de sécurité et les changements incompatibles. Bambuddy télécharge un fichier signé depuis GitHub toutes les quelques heures ; rien sur cette installation n'est envoyé.",
+    announcementsLearnMore: 'En savoir plus',
+    announcementsAllUsers: 'Afficher à tous les utilisateurs',
+    announcementsAllUsersDesc: "Désactivé : seuls les administrateurs les voient. Sans effet tant que l'authentification est désactivée.",
     localLogin: {
       disable: 'Désactiver la connexion locale par nom d\'utilisateur/mot de passe',
       disableHint: 'Quand activée, seuls les fournisseurs SSO peuvent se connecter. LDAP n\'est pas affecté. Définissez BAMBUDDY_LOCAL_LOGIN=true sur le serveur pour conserver une voie de récupération.',

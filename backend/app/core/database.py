@@ -288,6 +288,7 @@ async def init_db():
         active_print_spoolman,
         ams_history,
         ams_label,
+        announcement,
         api_key,
         archive,
         auth_ephemeral,

@@ -30,6 +30,21 @@ export default {
     installApp: '앱 설치',
     installAppSuccess: 'Bambuddy가 설치되었습니다'
   },
+  announcements: {
+    title: '공지사항',
+    unread: '읽지 않은 공지사항: {{count}}',
+    empty: '현재 공지사항이 없습니다.',
+    new: '새 소식',
+    readMore: '자세히 보기',
+    readMoreCount: '자세히 보기 (+{{count}})',
+    gotIt: '확인',
+    source: 'Bambuddy 개발자의 공지로, GitHub에서 가져옵니다. 설정에서 끌 수 있습니다.',
+    level: {
+      info: '정보',
+      important: '중요',
+      critical: '긴급',
+    },
+  },
   common: {
     plusNMore: '외 {{count}}개',
     save: '저장',
@@ -2101,6 +2116,11 @@ export default {
     checkPrinterFirmware: '프린터 펌웨어 확인',
     includeBetaUpdates: '베타 버전 포함',
     includeBetaUpdatesDesc: '업데이트 확인 시 베타 및 사전 릴리스 버전에 대해 알림',
+    announcementsEnabled: '공지사항 받기',
+    announcementsEnabledDesc: '보안 수정이나 호환되지 않는 변경 사항 등 Bambuddy 개발자의 메시지입니다. Bambuddy는 몇 시간마다 GitHub에서 서명된 파일을 가져오며, 이 설치에 관한 정보는 전송하지 않습니다.',
+    announcementsLearnMore: '자세히 알아보기',
+    announcementsAllUsers: '모든 사용자에게 표시',
+    announcementsAllUsersDesc: '꺼짐: 관리자만 볼 수 있습니다. 인증이 꺼져 있는 동안에는 효과가 없습니다.',
     localLogin: {
       disable: '로컬 사용자명/비밀번호 로그인 비활성화',
       disableHint: '활성화하면 SSO 공급자로만 로그인할 수 있습니다. LDAP는 영향을 받지 않습니다. 서버에서 BAMBUDDY_LOCAL_LOGIN=true 를 설정하면 복구 경로가 유지됩니다.'

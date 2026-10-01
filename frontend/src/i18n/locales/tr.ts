@@ -33,6 +33,21 @@ export default {
   },
 
   // Ortak
+  announcements: {
+    title: 'Duyurular',
+    unread: 'Okunmamış duyurular: {{count}}',
+    empty: 'Şu anda duyuru yok.',
+    new: 'Yeni',
+    readMore: 'Devamını oku',
+    readMoreCount: 'Devamını oku (+{{count}})',
+    gotIt: 'Anladım',
+    source: "Bambuddy geliştiricilerinden, GitHub'dan alınır. Ayarlardan kapatabilirsiniz.",
+    level: {
+      info: 'Bilgi',
+      important: 'Önemli',
+      critical: 'Kritik',
+    },
+  },
   common: {
     plusNMore: '+{{count}} tane daha',
     save: 'Kaydet',
@@ -2207,6 +2222,11 @@ export default {
     checkPrinterFirmware: 'Yazıcı firmware\'ini kontrol et',
     includeBetaUpdates: 'Beta sürümleri dahil et',
     includeBetaUpdatesDesc: 'Güncellemeleri kontrol ederken beta ve önyayım sürümleri hakkında bildir',
+    announcementsEnabled: 'Duyuruları al',
+    announcementsEnabledDesc: "Güvenlik düzeltmeleri ve uyumsuz değişiklikler gibi Bambuddy geliştiricilerinden gelen mesajlar. Bambuddy birkaç saatte bir GitHub'dan imzalı bir dosya indirir; bu kurulum hakkında hiçbir şey gönderilmez.",
+    announcementsLearnMore: 'Daha fazla bilgi',
+    announcementsAllUsers: 'Tüm kullanıcılara göster',
+    announcementsAllUsersDesc: 'Kapalı: yalnızca yöneticiler görür. Kimlik doğrulama kapalıyken etkisi yoktur.',
     localLogin: {
       disable: 'Yerel kullanıcı adı/şifre ile oturum açmayı devre dışı bırak',
       disableHint: 'Etkinleştirildiğinde yalnızca SSO sağlayıcıları ile oturum açılabilir. LDAP etkilenmez. Bir kurtarma yolu açık tutmak için sunucuda BAMBUDDY_LOCAL_LOGIN=true ayarlayın.',

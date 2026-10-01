@@ -1094,6 +1094,9 @@ export function SettingsPage() {
       // cannot read /settings. Nothing invalidated it, so a currency change
       // sat behind that query's own staleTime instead of showing up (#3123).
       queryClient.invalidateQueries({ queryKey: ['ui-flags'] });
+      // Switching announcements off (or to all users) changes who sees the
+      // sidebar entry and the banner; don't wait for the next poll.
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
       showToast(t('settings.toast.settingsSaved'), 'success');
     },
     onError: (error: Error) => {
@@ -1153,6 +1156,8 @@ export function SettingsPage() {
       baseline.check_updates !== localSettings.check_updates ||
       (baseline.check_printer_firmware ?? true) !== (localSettings.check_printer_firmware ?? true) ||
       (baseline.include_beta_updates ?? false) !== (localSettings.include_beta_updates ?? false) ||
+      (baseline.announcements_enabled ?? true) !== (localSettings.announcements_enabled ?? true) ||
+      (baseline.announcements_all_users ?? false) !== (localSettings.announcements_all_users ?? false) ||
       (baseline.local_login_enabled ?? true) !== (localSettings.local_login_enabled ?? true) ||
       baseline.notification_language !== localSettings.notification_language ||
       (baseline.bed_cooled_threshold ?? 35) !== (localSettings.bed_cooled_threshold ?? 35) ||
@@ -1269,6 +1274,8 @@ export function SettingsPage() {
         check_updates: localSettings.check_updates,
         check_printer_firmware: localSettings.check_printer_firmware,
         include_beta_updates: localSettings.include_beta_updates,
+        announcements_enabled: localSettings.announcements_enabled ?? true,
+        announcements_all_users: localSettings.announcements_all_users ?? false,
         local_login_enabled: localSettings.local_login_enabled,
         notification_language: localSettings.notification_language,
         bed_cooled_threshold: localSettings.bed_cooled_threshold,
@@ -3102,6 +3109,52 @@ export function SettingsPage() {
                     {t('settings.latestVersionRunning')}
                   </p>
                 ) : null}
+              </div>
+              <div className="border-t border-bambu-dark-tertiary pt-4">
+                <p className="text-xs font-medium text-bambu-gray uppercase tracking-wider mb-4">{t('announcements.title')}</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white">{t('settings.announcementsEnabled')}</p>
+                  <p className="text-sm text-bambu-gray">
+                    {t('settings.announcementsEnabledDesc')}{' '}
+                    <a
+                      href="https://wiki.bambuddy.cool/features/announcements/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-bambu-green hover:underline"
+                    >
+                      {t('settings.announcementsLearnMore')}
+                    </a>
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={localSettings.announcements_enabled ?? true}
+                    onChange={(e) => updateSetting('announcements_enabled', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-bambu-dark-tertiary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bambu-green"></div>
+                </label>
+              </div>
+              <div className={`flex items-center justify-between ${localSettings.announcements_enabled === false ? 'opacity-50' : ''}`}>
+                <div>
+                  <p className="text-white">{t('settings.announcementsAllUsers')}</p>
+                  <p className="text-sm text-bambu-gray">
+                    {t('settings.announcementsAllUsersDesc')}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={localSettings.announcements_all_users ?? false}
+                    onChange={(e) => updateSetting('announcements_all_users', e.target.checked)}
+                    disabled={localSettings.announcements_enabled === false}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-bambu-dark-tertiary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bambu-green"></div>
+                </label>
               </div>
             </CardContent>
           </Card>

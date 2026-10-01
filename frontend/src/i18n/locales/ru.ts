@@ -30,6 +30,21 @@ export default {
     installApp: "Установить приложение",
     installAppSuccess: "Bambuddy установлен",
   },
+  announcements: {
+    title: 'Объявления',
+    unread: 'Непрочитанные объявления: {{count}}',
+    empty: 'Сейчас объявлений нет.',
+    new: 'Новое',
+    readMore: 'Подробнее',
+    readMoreCount: 'Подробнее (+{{count}})',
+    gotIt: 'Понятно',
+    source: 'От разработчиков Bambuddy, загружаются с GitHub. Их можно отключить в настройках.',
+    level: {
+      info: 'Информация',
+      important: 'Важно',
+      critical: 'Критично',
+    },
+  },
   common: {
     plusNMore: 'ещё {{count}}',
     save: "Сохранить",
@@ -2098,6 +2113,11 @@ export default {
     checkPrinterFirmware: "Проверять прошивку принтера",
     includeBetaUpdates: "Включать бета-версии",
     includeBetaUpdatesDesc: "Уведомлять о бета- и предварительных версиях при проверке обновлений",
+    announcementsEnabled: 'Получать объявления',
+    announcementsEnabledDesc: 'Сообщения от разработчиков Bambuddy, например об исправлениях безопасности и несовместимых изменениях. Bambuddy раз в несколько часов загружает подписанный файл с GitHub; никакие данные об этой установке не отправляются.',
+    announcementsLearnMore: 'Подробнее',
+    announcementsAllUsers: 'Показывать всем пользователям',
+    announcementsAllUsersDesc: 'Выкл.: видят только администраторы. Не действует, пока аутентификация отключена.',
     localLogin: {
       disable: "Отключить локальный вход по имени пользователя и паролю",
       disableHint: "Если включено, вход возможен только через провайдеров SSO. На LDAP это не влияет. Чтобы сохранить аварийный способ входа, задайте на сервере BAMBUDDY_LOCAL_LOGIN=true.",

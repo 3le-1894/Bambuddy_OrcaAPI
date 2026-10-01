@@ -186,6 +186,8 @@ _BOOL_SETTING_KEYS = frozenset(
         "check_updates",
         "check_printer_firmware",
         "include_beta_updates",
+        "announcements_enabled",
+        "announcements_all_users",
         "virtual_printer_enabled",
         "ftp_retry_enabled",
         "mqtt_enabled",

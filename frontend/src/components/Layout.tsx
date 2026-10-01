@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Printer, Archive, ListOrdered, BarChart3, Cloud, Settings, Sun, Moon, Monitor, ChevronLeft, ChevronRight, Keyboard, Github, ArrowUpCircle, Wrench, FolderKanban, FolderOpen, X, Menu, Info, Plug, Bug, LogOut, Key, Loader2, Disc3, ShieldAlert, Globe, Bell, Receipt, type LucideIcon } from 'lucide-react';
+import { Printer, Archive, ListOrdered, BarChart3, Cloud, Settings, Sun, Moon, Monitor, ChevronLeft, ChevronRight, Keyboard, Github, ArrowUpCircle, Wrench, FolderKanban, FolderOpen, X, Menu, Info, Plug, Bug, LogOut, Key, Loader2, Disc3, ShieldAlert, Globe, Bell, Receipt, Megaphone, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
@@ -21,6 +21,9 @@ import { Card, CardHeader, CardContent } from './Card';
 import { parseUTCDate } from '../utils/date';
 import { Button } from './Button';
 import { BugReportBubble } from './BugReportBubble';
+import { AnnouncementsPanel } from './AnnouncementsPanel';
+import { AnnouncementBanner } from './AnnouncementBanner';
+import { useAnnouncements } from '../hooks/useAnnouncements';
 import {
   getHiddenSidebarSystemItemIds,
   getSidebarOrder,
@@ -148,6 +151,17 @@ export function Layout() {
     queryFn: api.getUiFlags,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Announcements from the Bambuddy maintainers: the sidebar entry above System,
+  // the slide-over list, and the banner for unread important/critical ones.
+  const { announcements, unread: unreadAnnouncements, bannerItems, markRead: markAnnouncementRead } =
+    useAnnouncements();
+  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
+  const openAnnouncements = useCallback(() => {
+    setMobileDrawerOpen(false);
+    setAnnouncementsOpen(true);
+  }, []);
+  const closeAnnouncements = useCallback(() => setAnnouncementsOpen(false), []);
 
   // Sponsor-prompt toast — fires once per session post-auth if a milestone is eligible.
   useSponsorPrompt(uiFlags?.currency ?? 'USD');
@@ -733,6 +747,26 @@ export function Layout() {
         <div className="flex-shrink-0 p-2 border-t border-bambu-dark-tertiary">
           {isSidebarCompact || sidebarExpanded ? (
             <div className="flex flex-col gap-2 px-2">
+              {/* Announcements: a row of its own above the icons, so it isn't one
+                  more glyph in a row people have stopped reading. Only while
+                  there is something to show. */}
+              {announcements.length > 0 && (
+                <button
+                  onClick={openAnnouncements}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-bambu-dark-tertiary transition-colors text-bambu-gray-light hover:text-white text-sm"
+                >
+                  <Megaphone className="w-5 h-5 flex-shrink-0" />
+                  <span>{t('announcements.title')}</span>
+                  {unreadAnnouncements.length > 0 && (
+                    <span
+                      className="ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[11px] font-bold rounded-full bg-bambu-green text-white"
+                      aria-label={t('announcements.unread', { count: unreadAnnouncements.length })}
+                    >
+                      {unreadAnnouncements.length}
+                    </span>
+                  )}
+                </button>
+              )}
               {/* Top row: icons */}
               <div className="flex items-center justify-center gap-1 flex-wrap">
                 {hasSwitchbarPlugs && (
@@ -855,6 +889,23 @@ export function Layout() {
                     <SwitchbarPopover onClose={() => setShowSwitchbar(false)} />
                   )}
                 </div>
+              )}
+              {announcements.length > 0 && (
+                <button
+                  onClick={openAnnouncements}
+                  className="relative p-2 rounded-lg hover:bg-bambu-dark-tertiary transition-colors text-bambu-gray-light hover:text-white"
+                  title={t('announcements.title')}
+                  aria-label={
+                    unreadAnnouncements.length > 0
+                      ? t('announcements.unread', { count: unreadAnnouncements.length })
+                      : t('announcements.title')
+                  }
+                >
+                  <Megaphone className="w-5 h-5" />
+                  {unreadAnnouncements.length > 0 && (
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-bambu-green ring-2 ring-bambu-dark-secondary" />
+                  )}
+                </button>
               )}
               {hasPermission('system:read') ? (
                 <NavLink
@@ -979,6 +1030,7 @@ export function Layout() {
             </div>
           </div>
         )}
+        <AnnouncementBanner items={bannerItems} onOpen={openAnnouncements} markRead={markAnnouncementRead} />
         {/* Persistent update banner */}
         {showUpdateBanner && (
           <div className="bg-bambu-green/20 border-b border-bambu-green/30 px-4 py-2 flex items-center justify-between">
@@ -1008,6 +1060,12 @@ export function Layout() {
         )}
         <Outlet />
       </main>
+      <AnnouncementsPanel
+        open={announcementsOpen}
+        onClose={closeAnnouncements}
+        announcements={announcements}
+        markRead={markAnnouncementRead}
+      />
 
       <UnknownSpoolModal
         prompt={unknownSpool.prompt}
