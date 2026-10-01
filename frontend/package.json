@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build && npm run check:baseline",
     "typecheck": "tsc -b",
-    "lint": "eslint .",
+    "lint": "eslint . --concurrency auto --cache --cache-location node_modules/.cache/eslint/",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run && npm run check:i18n",
