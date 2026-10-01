@@ -3135,6 +3135,65 @@ async def on_ams_change(printer_id: int, ams_data: list):
         logging.getLogger(__name__).error("Spoolman AMS sync failed for printer %s: %s", printer_id, e)
 
 
+# Largest finish photo attached to a notification; a bigger one is still linked.
+_FINISH_PHOTO_ATTACH_MAX_BYTES = 2_500_000
+
+
+async def _finish_photo_for_notification(
+    db, archive, archive_id: int, filename: str
+) -> tuple[str | None, bytes | None]:
+    """The ``{finish_photo_url}`` link and the bytes to attach, for a print's finish photo.
+
+    With authentication off the link is the archive's own photo route, as it
+    always was: it opens without a login and doesn't expire. With
+    authentication on that route needs a media token, which nothing tapping a
+    link in Telegram, CallMeBot or a Home Assistant notification has, so the
+    link only ever answered 401. The photo is then saved as a notification
+    photo as well (utils/notification_photos.py) and the link points there: an
+    unguessable name that opens this one photo and nothing else, for 3 days.
+
+    The link is relative when no External URL is set. Bytes over
+    ``_FINISH_PHOTO_ATTACH_MAX_BYTES`` are linked but not attached. Returns
+    ``(None, None)`` when the photo can't be found.
+    """
+    from backend.app.api.routes.settings import get_setting
+    from backend.app.core.auth import is_auth_enabled
+    from backend.app.utils.archive_paths import find_archive_photo
+    from backend.app.utils.notification_photos import save_notification_photo
+
+    log = logging.getLogger(__name__)
+    base = ((await get_setting(db, "external_url")) or "").strip().rstrip("/")
+    url: str | None = f"{base}/api/v1/archives/{archive_id}/photos/{filename}"
+
+    photo_bytes: bytes | None = None
+    try:
+        photo_path = find_archive_photo(archive, filename)
+        if photo_path is not None:
+            photo_bytes = await asyncio.to_thread(photo_path.read_bytes)
+    except Exception as e:
+        log.warning("[NOTIFY-BG] Failed to read finish photo bytes: %s", e)
+
+    try:
+        auth_on = await is_auth_enabled(db)
+    except Exception:
+        auth_on = True  # Unknown: the archive link may need a login, so don't rely on it.
+    if auth_on:
+        url = None
+        if photo_bytes:
+            try:
+                name = await asyncio.to_thread(save_notification_photo, photo_bytes, "print_complete")
+                url = f"{base}/api/v1/notifications/photos/{name}"
+            except Exception as e:
+                log.warning("[NOTIFY-BG] Failed to save finish photo for its link: %s", e)
+
+    if photo_bytes is not None and len(photo_bytes) > _FINISH_PHOTO_ATTACH_MAX_BYTES:
+        log.warning("[NOTIFY-BG] Finish photo too large for attachment: %s bytes", len(photo_bytes))
+        return url, None
+    if photo_bytes:
+        log.info("[NOTIFY-BG] Loaded finish photo bytes: %s bytes", len(photo_bytes))
+    return url, photo_bytes
+
+
 async def _capture_snapshot_for_notification(printer_id: int, printer, logger) -> bytes | None:
     """Capture a camera snapshot for notification image attachment.
 
@@ -8206,37 +8265,13 @@ async def on_print_complete(printer_id: int, data: dict):
                             archive_data["usage_results"] = usage_results
                         # Add finish photo URL and image bytes if available
                         if finish_photo_filename:
-                            from backend.app.api.routes.settings import get_setting
-
-                            external_url = await get_setting(db, "external_url")
-                            if external_url:
-                                external_url = external_url.rstrip("/")
-                                archive_data["finish_photo_url"] = (
-                                    f"{external_url}/api/v1/archives/{archive_id}/photos/{finish_photo_filename}"
-                                )
-                            else:
-                                # Fallback to relative URL (won't work for external services)
-                                archive_data["finish_photo_url"] = (
-                                    f"/api/v1/archives/{archive_id}/photos/{finish_photo_filename}"
-                                )
-
-                            # Read finish photo bytes for image attachment (e.g. Pushover)
-                            try:
-                                from backend.app.utils.archive_paths import find_archive_photo
-
-                                photo_path = find_archive_photo(archive, finish_photo_filename)
-                                if photo_path is not None:
-                                    photo_bytes = await asyncio.to_thread(photo_path.read_bytes)
-                                    if len(photo_bytes) <= 2_500_000:
-                                        archive_data["image_data"] = photo_bytes
-                                        logger.info("[NOTIFY-BG] Loaded finish photo bytes: %s bytes", len(photo_bytes))
-                                    else:
-                                        logger.warning(
-                                            f"[NOTIFY-BG] Finish photo too large for attachment: "
-                                            f"{len(photo_bytes)} bytes"
-                                        )
-                            except Exception as e:
-                                logger.warning("[NOTIFY-BG] Failed to read finish photo bytes: %s", e)
+                            photo_url, photo_bytes = await _finish_photo_for_notification(
+                                db, archive, archive_id, finish_photo_filename
+                            )
+                            if photo_url:
+                                archive_data["finish_photo_url"] = photo_url
+                            if photo_bytes:
+                                archive_data["image_data"] = photo_bytes
 
                 if not await _kill_switch_notification_already_sent(kill_switch_notification_task):
                     await notification_service.on_print_complete(
