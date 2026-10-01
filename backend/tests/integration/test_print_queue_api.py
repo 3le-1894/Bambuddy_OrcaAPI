@@ -121,6 +121,35 @@ class TestPrintQueueAPI:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    @pytest.mark.parametrize("pinned_first", [True, False], ids=["pinned-above-any", "any-above-pinned"])
+    async def test_list_follows_queue_position_across_pinned_and_any_jobs(
+        self, async_client: AsyncClient, printer_factory, queue_item_factory, pinned_first
+    ):
+        """A printer's first pending item is the one the scheduler starts next (#3200).
+
+        The printer card's "Next in queue" shows that first item. The list used
+        to sort by printer first, which put every "Any <model>" job (no
+        printer_id) ahead of a job pinned to the printer -- the order the
+        scheduler itself had until #3200 -- so the card kept naming a lower
+        "Any" job after dispatch was fixed.
+        """
+        printer = await printer_factory(model="P2S")
+        pinned_pos, any_pos = (1, 2) if pinned_first else (2, 1)
+        pinned = await queue_item_factory(printer_id=printer.id, position=pinned_pos)
+        any_model = await queue_item_factory(printer_id=None, target_model="P2S", position=any_pos)
+        later_any = await queue_item_factory(printer_id=None, target_model="P2S", position=3)
+
+        response = await async_client.get(
+            "/api/v1/queue/", params={"printer_id": printer.id, "status": "pending", "target_model": "P2S"}
+        )
+
+        assert response.status_code == 200
+        ids = [item["id"] for item in response.json()]
+        expected_head = [pinned.id, any_model.id] if pinned_first else [any_model.id, pinned.id]
+        assert ids == [*expected_head, later_any.id]
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
     async def test_add_to_queue(self, async_client: AsyncClient, printer_factory, archive_factory, db_session):
         """Verify item can be added to queue."""
         printer = await printer_factory()
