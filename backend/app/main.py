@@ -1507,6 +1507,52 @@ def _take_new_hms_faults(printer_id: int, errors: list) -> list:
     return _hms_errors_to_notify(errors, new)
 
 
+# `stg_cur` values that mean the printer is not in a preparation stage: 0 is
+# "Printing", -1 and 255 are "no stage" (#3211).
+_NO_PREPARATION_STAGES = frozenset({0, -1, 255})
+
+
+def _progress_milestone_to_notify(printer_id: int, state: PrinterState) -> int | None:
+    """The milestone (25, 50 or 75) this status update reaches for the first time, if any.
+
+    Records it as notified. Called only for a printing state with progress above 0.
+
+    Progress before the first layer is not progress through the print (#3211).
+    An A1 mini reports ``mc_percent`` 85 in the first frame of a print, while
+    still preheating the bed at layer 0, then 3, 7, 40 and 44 through its
+    calibration, and starts layer 1 at 45. Read as progress, that 85 sent the
+    75% notification together with Print Started, and since 75 was then on
+    record, 25 and 50 could never fire. So nothing counts while the printer
+    reports a layer count but has not started layer 1.
+
+    Without a layer count -- a print whose first frame carried no
+    ``total_layer_num``, until the pushall that asks for it is answered
+    (#2702) -- the preparation stage says the same thing: before layer 1 the
+    A1 mini reported ``stg_cur`` 2, 4, 14 and 1 (bed preheating, calibration,
+    homing), and 0 from layer 1 on. -1 and 255 are "no stage". A printer that
+    reports neither keeps the old behaviour rather than never notifying.
+    """
+    if (state.layer_num or 0) < 1:
+        if (state.total_layers or 0) > 0:
+            return None
+        if state.stg_cur not in _NO_PREPARATION_STAGES:
+            return None
+
+    progress = state.progress or 0
+    current_milestone = 0
+    if progress >= 75:
+        current_milestone = 75
+    elif progress >= 50:
+        current_milestone = 50
+    elif progress >= 25:
+        current_milestone = 25
+
+    if current_milestone > _last_progress_milestone.get(printer_id, 0):
+        _last_progress_milestone[printer_id] = current_milestone
+        return current_milestone
+    return None
+
+
 async def on_printer_status_change(printer_id: int, state: PrinterState):
     """Handle printer status changes - broadcast via WebSocket."""
     # Connected-edge reconciliation (#1542 follow-up). When the printer
@@ -1817,20 +1863,8 @@ async def on_printer_status_change(printer_id: int, state: PrinterState):
     is_printing = state.state in ("RUNNING", "PRINTING")
 
     if is_printing and progress > 0:
-        # Determine which milestone we've reached
-        current_milestone = 0
-        if progress >= 75:
-            current_milestone = 75
-        elif progress >= 50:
-            current_milestone = 50
-        elif progress >= 25:
-            current_milestone = 25
-
-        last_milestone = _last_progress_milestone.get(printer_id, 0)
-
-        # If we've crossed a new milestone, send notification
-        if current_milestone > last_milestone:
-            _last_progress_milestone[printer_id] = current_milestone
+        current_milestone = _progress_milestone_to_notify(printer_id, state)
+        if current_milestone is not None:
             try:
                 from backend.app.models.printer import Printer
 
@@ -3947,6 +3981,12 @@ async def on_print_start(printer_id: int, data: dict):
 
     # Clear any stale user-stopped flag from previous print cycles
     _user_stopped_printers.discard(printer_id)
+    # A new print starts its milestones from zero (#3211). The status path only
+    # resets on progress below 5 while not printing, which a printer that goes
+    # from FINISH at 100% straight into a new print at a preparation-phase 85%
+    # never shows. This callback does not fire after a Bambuddy restart (#1304)
+    # or on resume from pause, so it cannot repeat a milestone mid-print.
+    _last_progress_milestone[printer_id] = 0
     _kill_switch_notification_tasks.pop(printer_id, None)
 
     # #1721: drop any leftover pre-captured finish frame from a prior print
