@@ -69,7 +69,8 @@ export function useAnnouncements() {
   const { mutate } = markReadMutation;
   const markRead = useCallback((id: string) => mutate(id), [mutate]);
 
-  const unread = useMemo(() => announcements.filter((a) => !a.read), [announcements]);
+  // History is never unread: it was current once, and either read then or missed.
+  const unread = useMemo(() => announcements.filter((a) => !a.read && !a.archived), [announcements]);
 
   // What earns a banner: important or critical, not yet read. Most severe first,
   // then newest (the list already comes newest first).

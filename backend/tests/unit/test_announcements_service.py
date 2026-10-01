@@ -244,13 +244,30 @@ class TestApply:
 
 class TestReadState:
     @pytest.mark.asyncio
-    async def test_expired_ones_are_not_listed(self, db_session):
+    async def test_expired_ones_are_history(self, db_session):
         past = (datetime.now(timezone.utc) - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         future = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         p = payload(entry("gone", expires_at=past), entry("live", expires_at=future), entry("forever"))
         await svc.apply_payload(db_session, p, STABLE_DOCKER)
         await db_session.commit()
-        assert sorted(i["id"] for i in await svc.list_for(db_session, None)) == ["forever", "live"]
+        listed = {i["id"]: i["archived"] for i in await svc.list_for(db_session, None)}
+        assert listed == {"gone": True, "live": False, "forever": False}
+
+    @pytest.mark.asyncio
+    async def test_archived_in_the_feed_is_history_even_without_an_expiry(self, db_session):
+        await svc.apply_payload(db_session, payload(entry("old", archived=True)), STABLE_DOCKER)
+        await db_session.commit()
+        [item] = await svc.list_for(db_session, None)
+        assert item["archived"] is True
+
+    @pytest.mark.asyncio
+    async def test_history_dropped_by_the_feed_is_deleted(self, db_session):
+        past = (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        await svc.apply_payload(db_session, payload(entry("old", expires_at=past, archived=True)), STABLE_DOCKER)
+        await db_session.commit()
+        await svc.apply_payload(db_session, payload(serial=2), STABLE_DOCKER)
+        await db_session.commit()
+        assert await svc.list_for(db_session, None) == []
 
     @pytest.mark.asyncio
     async def test_reading_twice_with_auth_off_records_once(self, db_session):
@@ -285,6 +302,21 @@ class TestRefresh:
         ):
             assert await svc.refresh(db_session) == 1
         assert await _stored(db_session) == ["a1"]
+
+    @pytest.mark.asyncio
+    async def test_open_pages_are_told_only_when_the_feed_moved_on(self, db_session):
+        feed = signed(payload(entry("a1"), serial=3))
+        with (
+            patch.object(svc, "_download", AsyncMock(return_value=feed)),
+            patch.object(svc, "TRUSTED_KEYS", TRUSTED),
+            patch.object(svc, "install_facts", AsyncMock(return_value=STABLE_DOCKER)),
+            patch("backend.app.core.websocket.ws_manager.broadcast", AsyncMock()) as broadcast,
+        ):
+            await svc.refresh(db_session)
+            broadcast.assert_awaited_once_with({"type": "announcements_changed"})
+            # The same feed again: nothing new to tell anyone.
+            await svc.refresh(db_session)
+            assert broadcast.await_count == 1
 
     @pytest.mark.asyncio
     async def test_a_bad_feed_keeps_the_last_good_list(self, db_session):

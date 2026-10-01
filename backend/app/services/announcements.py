@@ -251,13 +251,21 @@ def parse_entry(raw: object) -> Entry | None:
         return None
     link = raw.get("link_url")
     link = link if isinstance(link, str) and link_allowed(link) else None
+    published_at = _parse_time(raw.get("published_at"))
+    expires_at = _parse_time(raw.get("expires_at"))
+    # History is whatever has expired; the feed's ``archived`` flag says the same
+    # thing for messages the registrar kept after their expiry. One flagged but
+    # still in date by this install's clock is history anyway: expire it now.
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if raw.get("archived") is True and (expires_at is None or expires_at > now):
+        expires_at = now
     return Entry(
         public_id=public_id,
         level=level,
         texts=texts,
         link_url=link,
-        published_at=_parse_time(raw.get("published_at")),
-        expires_at=_parse_time(raw.get("expires_at")),
+        published_at=published_at,
+        expires_at=expires_at,
     )
 
 
@@ -344,6 +352,7 @@ async def refresh(db: AsyncSession) -> int | None:
     """
     if not await is_enabled(db):
         return None
+    seen_before = int(await _get(db, SERIAL_KEY) or 0)
     try:
         content = await _download()
         payload = verify_feed(content)
@@ -360,27 +369,36 @@ async def refresh(db: AsyncSession) -> int | None:
     await _set(db, LAST_FETCH_KEY, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     await db.commit()
     logger.info("Announcements feed #%s: %d for this install", payload["serial"], count)
+    if payload["serial"] > seen_before:
+        await _tell_open_pages()
     return count
+
+
+async def _tell_open_pages() -> None:
+    """Have every open Bambuddy page re-read the list, so a new message's dot and
+    banner appear without a reload. The event carries nothing: each page asks
+    GET /announcements, which answers by who is asking."""
+    from backend.app.core.websocket import ws_manager
+
+    try:
+        await ws_manager.broadcast({"type": "announcements_changed"})
+    except Exception:  # A page that misses it catches up on its own poll.
+        logger.debug("announcements_changed broadcast failed", exc_info=True)
 
 
 # ---- read state ----------------------------------------------------------------------
 
 
-def _visible_filter(now: datetime):
-    return (Announcement.expires_at.is_(None)) | (Announcement.expires_at > now)
-
-
 async def list_for(db: AsyncSession, user_id: int | None) -> list[dict]:
-    """Live announcements, newest first, each with whether this user has read it."""
+    """Every stored announcement, newest first, with this user's read state.
+
+    ``archived`` marks history: messages past their expiry, which the panel lists
+    under "Earlier" and which never count as unread or raise a banner. The feed
+    decides how much history there is; a message it drops is deleted here.
+    """
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     rows = (
-        (
-            await db.execute(
-                select(Announcement)
-                .where(_visible_filter(now))
-                .order_by(Announcement.published_at.desc(), Announcement.id.desc())
-            )
-        )
+        (await db.execute(select(Announcement).order_by(Announcement.published_at.desc(), Announcement.id.desc())))
         .scalars()
         .all()
     )
@@ -400,6 +418,7 @@ async def list_for(db: AsyncSession, user_id: int | None) -> list[dict]:
                 "link_url": a.link_url,
                 "published_at": a.published_at.isoformat() + "Z" if a.published_at else None,
                 "expires_at": a.expires_at.isoformat() + "Z" if a.expires_at else None,
+                "archived": a.expires_at is not None and a.expires_at <= now,
                 "read": a.id in read_ids,
             }
         )

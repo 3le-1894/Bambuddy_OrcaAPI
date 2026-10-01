@@ -37,6 +37,7 @@ export default {
     title: 'Оголошення',
     unread: 'Непрочитані оголошення: {{count}}',
     empty: 'Наразі оголошень немає.',
+    earlier: 'Раніше ({{count}})',
     new: 'Нове',
     readMore: 'Докладніше',
     readMoreCount: 'Докладніше (+{{count}})',

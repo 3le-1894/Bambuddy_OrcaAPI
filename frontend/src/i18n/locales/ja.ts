@@ -37,6 +37,7 @@ export default {
     title: 'お知らせ',
     unread: '未読のお知らせ: {{count}}',
     empty: '現在お知らせはありません。',
+    earlier: '過去のお知らせ ({{count}})',
     new: '新着',
     readMore: '詳細を見る',
     readMoreCount: '詳細を見る (+{{count}})',

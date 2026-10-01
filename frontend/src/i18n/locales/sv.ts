@@ -37,6 +37,7 @@ export default {
     title: 'Meddelanden',
     unread: 'Olästa meddelanden: {{count}}',
     empty: 'Inga meddelanden just nu.',
+    earlier: 'Tidigare ({{count}})',
     new: 'Ny',
     readMore: 'Läs mer',
     readMoreCount: 'Läs mer (+{{count}})',

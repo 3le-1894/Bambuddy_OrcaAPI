@@ -34,6 +34,7 @@ export default {
     title: 'Объявления',
     unread: 'Непрочитанные объявления: {{count}}',
     empty: 'Сейчас объявлений нет.',
+    earlier: 'Ранее ({{count}})',
     new: 'Новое',
     readMore: 'Подробнее',
     readMoreCount: 'Подробнее (+{{count}})',

@@ -403,6 +403,12 @@ export function useWebSocket() {
         }));
         break;
 
+      case 'announcements_changed':
+        // The backend fetched a newer feed: re-read the list so the sidebar dot
+        // and the banner appear without a reload. The event says nothing itself.
+        debouncedInvalidate('announcements');
+        break;
+
       case 'inventory_changed':
         // Spool created/updated/deleted/archived/restored - refresh inventory across all tabs
         debouncedInvalidate('inventory-spools');
