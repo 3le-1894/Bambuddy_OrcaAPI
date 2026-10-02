@@ -3518,7 +3518,9 @@ def _render_confirm_prompt_page(request: Request, archive: PrintArchive, verdict
     with JavaScript off -- gets the same page and presses the button.
     """
     name = html_escape(archive.print_name or archive.filename or "")
-    label = _VERDICT_LABELS.get(verdict, verdict)
+    # Escaped although the route only lets good/reject through: the page must
+    # not depend on a check made in another function.
+    label = html_escape(_VERDICT_LABELS.get(verdict, verdict))
     # No action attribute: the form posts back to the URL the page was loaded
     # from, so it works behind a reverse proxy and on a host external_url does
     # not name.
