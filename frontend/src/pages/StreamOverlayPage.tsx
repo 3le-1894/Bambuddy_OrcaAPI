@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { UpdatedStreamOverlay } from '../components/UpdatedStreamOverlay';
 import { api, ApiError, withStreamToken } from '../api/client';
 import { formatDuration, formatETA, type TimeFormat } from '../utils/date';
 import { mapModelCode } from '../utils/printerModel';
+import { useOverlayCameraRecovery } from '../hooks/useOverlayCameraRecovery';
 
 type TFunction = (key: string, options?: Record<string, unknown>) => string;
 
@@ -168,7 +169,6 @@ export function StreamOverlayPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const id = parseInt(printerId || '0', 10);
-  const [imageKey, setImageKey] = useState(Date.now());
 
   const config = useMemo(() => parseConfig(searchParams), [searchParams]);
   const sizes = getSizeClasses(config.size);
@@ -224,6 +224,7 @@ export function StreamOverlayPage() {
     config.showModel ? mapModelCode(printer?.model ?? null) : null,
   ].filter(Boolean).join(' · ');
   const status = kiosk ? overlay : statusData;
+  const { imageKey, handleStreamError } = useOverlayCameraRecovery(id > 0 && config.showCamera && status != null);
   const timeFormat: TimeFormat = (kiosk ? overlay?.time_format : settings?.time_format) || 'system';
 
   // WebSocket for real-time updates (JWT-authenticated; skipped in kiosk mode,
@@ -291,13 +292,6 @@ export function StreamOverlayPage() {
       document.title = 'Bambuddy';
     };
   }, [printer, t]);
-
-  // Refresh stream on error
-  const handleStreamError = () => {
-    setTimeout(() => {
-      setImageKey(Date.now());
-    }, 3000);
-  };
 
   if (!id) {
     return (
