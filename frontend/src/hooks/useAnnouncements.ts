@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { announcementsApi, type Announcement, type AnnouncementText } from '../api/client';
+import { announcementsApi, type Announcement, type AnnouncementList, type AnnouncementText } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
 // Hosts a message may link to. The backend already drops any other link; this
@@ -38,9 +38,9 @@ const SEVERITY: Record<Announcement['level'], number> = { critical: 2, important
 /**
  * Announcements from the Bambuddy maintainers, for whoever may see them.
  *
- * The backend answers with an empty list for anyone who may not (and when the
- * install has them switched off), so an empty list is the one signal for
- * "show nothing" -- no separate permission check here.
+ * The backend says whether this user may see them at all (`visible`: switched
+ * on, and admin or "show to all users"), so there is no separate permission
+ * check here. `visible` with an empty list is an empty inbox, not "hide".
  */
 export function useAnnouncements() {
   const { authEnabled, user, loading } = useAuth();
@@ -55,13 +55,14 @@ export function useAnnouncements() {
     // to GitHub every few hours.
     refetchInterval: 10 * 60 * 1000,
   });
-  const announcements = useMemo(() => data ?? [], [data]);
+  const visible = data?.visible ?? false;
+  const announcements = useMemo(() => data?.announcements ?? [], [data]);
 
   const markReadMutation = useMutation({
     mutationFn: announcementsApi.markRead,
     onMutate: (id: string) => {
-      queryClient.setQueryData<Announcement[]>(['announcements'], (old) =>
-        old?.map((a) => (a.id === id ? { ...a, read: true } : a))
+      queryClient.setQueryData<AnnouncementList>(['announcements'], (old) =>
+        old && { ...old, announcements: old.announcements.map((a) => (a.id === id ? { ...a, read: true } : a)) }
       );
     },
     onError: () => queryClient.invalidateQueries({ queryKey: ['announcements'] }),
@@ -82,5 +83,5 @@ export function useAnnouncements() {
     [unread]
   );
 
-  return { announcements, unread, bannerItems, markRead };
+  return { visible, announcements, unread, bannerItems, markRead };
 }

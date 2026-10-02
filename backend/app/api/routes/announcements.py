@@ -2,9 +2,10 @@
 
 Shown to administrators, and to every signed-in user when the
 ``announcements_all_users`` setting is on. With authentication off whoever opens
-Bambuddy runs it, so they see them. Anyone else gets an empty list rather than a
-403: the sidebar entry and the banner are hidden on "nothing to show", which is
-the same answer for "nothing published" and "not for you".
+Bambuddy runs it, so they see them. Anyone else gets ``visible: false`` and an
+empty list rather than a 403. ``visible`` is separate from the list because the
+sidebar entry is there for whoever may see announcements, also while nothing is
+published, and hidden for everyone else.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -40,11 +41,15 @@ async def _may_see(db: AsyncSession, user: User | None) -> bool:
 async def list_announcements(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(require_auth_if_enabled),
-) -> list[dict]:
-    """Live announcements for this user, newest first, with their read state."""
+) -> dict:
+    """Whether this user may see announcements, and the live ones newest first,
+    with their read state."""
     if not await _may_see(db, current_user):
-        return []
-    return await service.list_for(db, current_user.id if current_user else None)
+        return {"visible": False, "announcements": []}
+    return {
+        "visible": True,
+        "announcements": await service.list_for(db, current_user.id if current_user else None),
+    }
 
 
 @router.post("/{public_id}/read", status_code=status.HTTP_204_NO_CONTENT)
