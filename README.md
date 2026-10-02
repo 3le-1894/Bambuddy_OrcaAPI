@@ -302,7 +302,7 @@ Optional but recommended — drop the [`slicer-api/` Compose stack](slicer-api/R
 - **Previews** — larger previews with zoom and fullscreen, cover images, PDF and STEP previews, and **Open in slicer** with a choice of slicer from the 3D preview
 - **Combine to 3MF** — put several STLs, or copies of one, into one 3MF that slices onto a single plate
 - Mobile-friendly with always-visible action buttons
-- **Server-side Slice button** (optional) — slice STL/3MF without a desktop slicer when the [`slicer-api/` Compose stack](slicer-api/README.md) is running; the result lands as a new `.gcode.3mf` in the same folder, with progress shown via a toast tracker that follows the job to completion. The Slice dialog edits the full print-parameter tree, can **slice as designed** with the file's own settings, and auto-orients / auto-arranges on request. The slicer sidecar ships as pre-built images (GHCR / Docker Hub) and runs on ARM64 too ([details](https://wiki.bambuddy.cool/features/slicer-api/))
+- **Server-side Slice button** (optional) — slice STL/3MF without a desktop slicer when the [`slicer-api/` Compose stack](slicer-api/README.md) is running; the result lands as a new `.gcode.3mf` in the same folder, with progress shown via a toast tracker that follows the job to completion. The Slice dialog edits the full print-parameter tree, can **slice as designed** with the file's own settings, and auto-orients / auto-arranges on request. The slicer sidecar ships as pre-built images (GHCR / Docker Hub) and runs on ARM64 hosts under emulation, experimental ([details](https://wiki.bambuddy.cool/features/slicer-api/))
 
 ### 🌍 MakerWorld Integration
 - Paste any `makerworld.com/models/…` URL → preview, plate picker, and import without leaving Bambuddy
