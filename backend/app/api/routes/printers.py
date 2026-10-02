@@ -49,7 +49,7 @@ from backend.app.schemas.printer import (
     PrintOptionsResponse,
     hms_error_responses,
 )
-from backend.app.services import drying_preflight
+from backend.app.services import drying_preflight, kprofile_drift
 from backend.app.services.bambu_ftp import (
     cache_3mf_download,
     delete_file_async,
@@ -3138,6 +3138,9 @@ async def configure_ams_slot(
         filament_id=filament_id_for_kprofile,
         nozzle_diameter=nozzle_diameter,
     )
+    # A deliberate Default pick must not be "restored" to the spool's stored
+    # profile by the lost-selection check (#3219).
+    kprofile_drift.note_slot_configured(printer_id, ams_id, tray_id, cali_idx)
 
     # Method 2: Only send extrusion_cali_set when NO existing profile was selected
     # (cali_idx == -1). When cali_idx >= 0, extrusion_cali_sel already selected the
