@@ -1,12 +1,13 @@
 """Choosing what a spool label shows, and PNG output (#2981).
 
-Text is checked in an uncompressed PDF, where ReportLab writes each string as
-it was drawn.
+Text is checked in the content stream of an uncompressed PDF, where ReportLab
+writes each string as it was drawn.
 """
 
 from __future__ import annotations
 
 import io
+import re
 from datetime import date
 from unittest.mock import patch
 
@@ -51,13 +52,28 @@ def _data(**overrides) -> LabelData:
 
 
 def _text(template: str, data: LabelData, fields=DEFAULT_LABEL_FIELDS) -> bytes:
+    """The page's content stream, i.e. only the text and shapes drawn.
+
+    Not the whole file: its creation timestamp, document ID and xref offsets
+    change from run to run, so a "not in" check against them fails whenever
+    they happen to contain the digits (a run at 14:32:30 writes ``143230``).
+    The QR code's image stream is left out for the same reason.
+    """
     w_mm, h_mm = label_size_mm(template)
     buf = io.BytesIO()
     c = rl_canvas.Canvas(buf, pagesize=(w_mm * mm, h_mm * mm), pageCompression=0)
     _draw_label(c, 0, 0, w_mm * mm, h_mm * mm, data, False, fields)
     c.showPage()
     c.save()
-    return buf.getvalue()
+    pdf = buf.getvalue()
+    streams = []
+    for m in re.finditer(rb"stream\r?\n(.*?)endstream", pdf, re.S):
+        # The object's own dictionary sits between its "N 0 obj" and "stream".
+        head = pdf[pdf.rfind(b" obj", 0, m.start()) : m.start()]
+        if b"/Subtype /Image" not in head:
+            streams.append(m.group(1))
+    assert len(streams) == 1, f"expected one page content stream, got {len(streams)}"
+    return streams[0]
 
 
 def test_default_fields_are_what_labels_always_carried():
