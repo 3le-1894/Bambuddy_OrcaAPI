@@ -37,10 +37,12 @@ def _resolve_pool_kwargs() -> dict:
     """Build the pool kwargs for ``create_async_engine`` (issue #2572).
 
     Dialect-aware defaults, each overridable via env (``DB_POOL_SIZE`` etc.):
-      - PostgreSQL: pool_size 20 + max_overflow 80, ``pool_pre_ping`` (recover
+      - PostgreSQL: pool_size 20 + max_overflow 60, ``pool_pre_ping`` (recover
         server-dropped connections instead of erroring the request) and
         ``pool_recycle`` 1800s. The old hard-coded 10 + 20 exhausted on large
-        farms while printer callbacks held connections.
+        farms while printer callbacks held connections. The 80-connection
+        ceiling fits a stock server (max_connections 100, 3 reserved for
+        superusers); 20 + 80 did not, and tripped the startup pool check.
       - SQLite: pool_size 20 + max_overflow 200 (unchanged); no pre-ping /
         recycle — the connection is a local file, not a server socket.
     """
@@ -50,7 +52,7 @@ def _resolve_pool_kwargs() -> dict:
         kwargs = {"pool_size": pool_size, "max_overflow": max_overflow}
     else:
         pool_size = settings.db_pool_size if settings.db_pool_size is not None else 20
-        max_overflow = settings.db_max_overflow if settings.db_max_overflow is not None else 80
+        max_overflow = settings.db_max_overflow if settings.db_max_overflow is not None else 60
         kwargs = {
             "pool_size": pool_size,
             "max_overflow": max_overflow,
