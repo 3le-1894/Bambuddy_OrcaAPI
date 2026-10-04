@@ -1,6 +1,6 @@
 # Windows desktop profile sync
 
-This fork adds **Profiles → Local Profiles → Sync desktop Orca profiles**.
+This fork adds **Profiles â†’ Local Profiles â†’ Sync desktop Orca profiles**.
 Save changes in desktop Orca, then click the button. Bambuddy requests the
 saved profiles from the Windows Orca API companion, imports new profiles,
 updates managed profiles, and refreshes the slicing dropdowns. The page

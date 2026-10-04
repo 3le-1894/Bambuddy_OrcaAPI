@@ -98,7 +98,7 @@ try {
     Wait-Healthy 'http://127.0.0.1:8000/api/v1/local-presets/desktop-sync/status'
     Invoke-Docker image tag $image bambuddy-orcaapi:local
     Write-Output "Deployment healthy. Backup: $backup"
-    Write-Output 'Open Profiles > Local Profiles > Sync desktop Orca profiles.'
+    Write-Output 'Open Profiles > Local Profiles > Desktop Orca profiles > Sync now.'
 } catch {
     $failure = $_
     Copy-Item -LiteralPath (Join-Path $backup 'compose.yaml') -Destination $compose -Force
