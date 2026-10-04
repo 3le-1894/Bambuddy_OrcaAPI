@@ -82,6 +82,7 @@ const mockLocalPresets = {
 describe('LocalProfilesView', () => {
   beforeEach(() => {
     server.use(
+      http.get('/api/v1/local-presets/desktop-sync/status', () => HttpResponse.json({ synced_at: null })),
       http.get('/api/v1/local-presets/', () => {
         return HttpResponse.json(mockLocalPresets);
       }),
@@ -100,6 +101,17 @@ describe('LocalProfilesView', () => {
 
     expect(screen.getByText('eSUN PETG @Bambu Lab H2D')).toBeInTheDocument();
     expect(screen.getByText('0.20mm Standard @BBL X1C')).toBeInTheDocument();
+  });
+
+  it('syncs desktop profiles and shows conflicts without hiding the results', async () => {
+    server.use(http.post('/api/v1/local-presets/desktop-sync', () => HttpResponse.json({
+      added: 1, updated: 2, unchanged: 13, conflicts: ['Edited PLA'], missing: ['Old PETG'], synced_at: '2026-10-04T05:00:00Z',
+    })));
+    render(<LocalProfilesView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sync desktop Orca profiles' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('2 updated, 1 added, 13 unchanged.');
+    expect(screen.getByRole('status')).toHaveTextContent('Edited PLA');
+    expect(screen.getByRole('status')).toHaveTextContent('Old PETG');
   });
 
   it('shows material badges from filament_type', async () => {

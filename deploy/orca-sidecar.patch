@@ -1,0 +1,756 @@
+diff --git a/.gitignore b/.gitignore
+index 30dd3cb..80ab2a9 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -139,4 +139,5 @@ dist
+ 
+ .DS_Store
+ 
+-data/
+\ No newline at end of file
++data/
++runtime/
+diff --git a/README.windows.md b/README.windows.md
+new file mode 100644
+index 0000000..cf2b3c1
+--- /dev/null
++++ b/README.windows.md
+@@ -0,0 +1,103 @@
++# Windows Orca sidecar for Bambuddy
++
++This installation runs the Orca API wrapper on Windows, with a dedicated copy
++of the custom OrcaSlicer build. The API is available at
++`http://127.0.0.1:3003`; Dockerized Bambuddy reaches it at
++`http://host.docker.internal:3003`.
++
++The runtime executable, DLLs and profile resources are copied from
++`C:\CustomOrcaSlicer\OrcaSlicer_3leVersion\build\src\Release`. The copied
++DLL has the same SHA256 as the desktop build. `runtime/build.json` records
++the version, source revision at snapshot time, and DLL hash.
++
++The service starts at Windows logon using the scheduled task
++**Bambuddy Orca API**. It runs under the current Windows user, with hidden
++windows. Diagnostics are in `logs/sidecar.stderr.log` and
++`logs/sidecar.stdout.log`.
++
++## Controls
++
++```powershell
++Start-ScheduledTask -TaskName 'Bambuddy Orca API'
++Invoke-RestMethod http://127.0.0.1:3003/health
++```
++
++To stop the service, stop its task and then its tracked Node process:
++
++```powershell
++Stop-ScheduledTask -TaskName 'Bambuddy Orca API'
++& C:\Bambuddy\OrcaSlicer_API\scripts\stop-windows.ps1
++```
++
++## Rebuild after changing Orca
++
++Finish building the desktop Orca fork first. Stop the sidecar, then run:
++
++```powershell
++Set-Location C:\Bambuddy\OrcaSlicer_API
++& .\scripts\build-windows.ps1
++Start-ScheduledTask -TaskName 'Bambuddy Orca API'
++```
++
++The builder refreshes the executable, DLLs and resources together. Dependencies
++are pinned by `package-lock.json`. Initial dependency installation uses
++`npm ci`; the local compiled service runs with the Node executable copied
++into `runtime`.
++
++## Desktop profiles
++
++The deployed Bambuddy fork now provides **Profiles → Local Profiles → Sync
++desktop Orca profiles**. Save changes in desktop Orca before clicking. The
++button reads this PC's configured account folder through the companion API,
++updates managed profiles, and reports conflicts and removed profiles. Use
++this button for routine syncs; it maintains tracking for edits made in Bambuddy.
++The deployment script configures the folder and a shared authentication token.
++
++Bambuddy sends the selected profiles with each API request. Its imported local
++presets are snapshots; saving a desktop preset does not automatically modify
++Bambuddy's copy. The earlier CLI sync below remains available for recovery,
++but it bypasses the button's conflict tracking and should not be used for
++routine syncs after adopting profiles through the button:
++
++```powershell
++Set-Location C:\Bambuddy\OrcaSlicer_API
++python scripts/sync-desktop-profiles.py --source 'C:\Users\3leme\AppData\Roaming\OrcaSlicer\user\5e5d6945-094f-439c-bad1-a5399dcb4267'
++```
++
++This resolves presets against this sidecar's matching resource tree and updates
++same-named entries under **Bambuddy → Profiles → Local Profiles**. It also
++stores the resolved JSON under `data/printers`, `data/presets`, and
++`data/filaments`. Filament ordering is supplied by Bambuddy per print.
++
++The custom machine/process identity patch retains `from: User` and the
++original system `inherits` after flattening. Orca then compares a renamed
++printer such as Vulcan against its correct Bambu parent. Filaments retain the
++CLI's required `system` marker.
++
++## Verification
++
++`scripts/verify-slice.py` sends the same multipart fields used by Bambuddy:
++`file`, `printerProfile`, `presetProfile`, repeated `filamentProfile`,
++`plate`, `exportType`, and `requestId`. It verifies the output ZIP and checks
++for nonempty embedded G-code. Reports and sliced sample files are stored in
++`data/verification`.
++
++The Bambuddy integration test also uploaded `X2D_Riser_Test.3mf` to the
++**Orca API verification** Library folder and sliced plate 1 through
++`POST /api/v1/library/files/{file_id}/slice`. Job 1 completed in approximately
++18 seconds, reported `used_embedded_settings: false`, and produced valid
++embedded G-code. A deliberate `layer_height: 0.25` override was verified in
++the resulting project settings, proving that Bambuddy's selected profile
++path was used. `data/verification/bambuddy-x2d.report.json` records the result.
++No print was dispatched. The wrapper's 115 unit tests and source ESLint check
++passed after the Windows and custom-profile changes.
++
++Windows Orca does not implement the Linux `--pipe` progress stream. This
++installation publishes initial and final request status; percentage updates
++during slicing are unavailable. Bambuddy's stall timeout therefore limits a
++Windows slice that produces no progress updates. Keep Windows awake while
++remote slicing is needed.
++
++The running Bambuddy image is now built from the local `Bambuddy_OrcaAPI`
++fork. Run `C:\Bambuddy\Update-BambuddyFork.ps1` to rebuild and deploy the
++current checkout. It does not automatically merge upstream changes.
+diff --git a/scripts/build-windows.ps1 b/scripts/build-windows.ps1
+new file mode 100644
+index 0000000..a6480dc
+--- /dev/null
++++ b/scripts/build-windows.ps1
+@@ -0,0 +1,85 @@
++param(
++    [string]$OrcaRoot = 'C:\CustomOrcaSlicer\OrcaSlicer_3leVersion',
++    [string]$NodePath = (Get-Command node -ErrorAction Stop).Source
++)
++
++$ErrorActionPreference = 'Stop'
++$apiRoot = Split-Path $PSScriptRoot -Parent
++$source = Join-Path $OrcaRoot 'build\src\Release'
++$runtime = Join-Path $apiRoot 'runtime'
++$destination = Join-Path $runtime 'orca'
++$dll = Join-Path $source 'OrcaSlicer.dll'
++if (-not (Test-Path -LiteralPath $dll)) { throw "Build Orca first: $dll is missing." }
++if (-not (Test-Path -LiteralPath (Join-Path $source 'resources\profiles\BBL'))) {
++    throw 'The Orca build does not contain its BBL profile resources.'
++}
++if (Test-Path -LiteralPath (Join-Path $runtime 'sidecar.pid')) {
++    $savedPid = [int](Get-Content (Join-Path $runtime 'sidecar.pid'))
++    if (Get-Process -Id $savedPid -ErrorAction SilentlyContinue) {
++        throw 'Stop the sidecar before replacing its runtime snapshot.'
++    }
++}
++New-Item -ItemType Directory -Force -Path $destination | Out-Null
++$before = (Get-FileHash -LiteralPath $dll -Algorithm SHA256).Hash
++Get-ChildItem -LiteralPath $source -File | Where-Object {
++    $_.Extension -eq '.dll' -or $_.Name -eq 'orca-slicer.exe'
++} | Copy-Item -Destination $destination -Force
++foreach ($folder in @('resources', 'python')) {
++    $srcFolder = Join-Path $source $folder
++    if (Test-Path -LiteralPath $srcFolder) {
++        $target = [IO.Path]::GetFullPath((Join-Path $destination $folder))
++        $allowed = [IO.Path]::GetFullPath($destination).TrimEnd('\') + '\'
++        if (-not $target.StartsWith($allowed, [StringComparison]::OrdinalIgnoreCase)) {
++            throw "Snapshot target is outside the runtime: $target"
++        }
++        & robocopy $srcFolder $target /MIR /MT:8 /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
++        if ($LASTEXITCODE -gt 7) { throw "Snapshot copy failed: $srcFolder" }
++    }
++}
++$after = (Get-FileHash -LiteralPath $dll -Algorithm SHA256).Hash
++$copied = (Get-FileHash -LiteralPath (Join-Path $destination 'OrcaSlicer.dll') -Algorithm SHA256).Hash
++if ($before -ne $after -or $before -ne $copied) {
++    throw 'Orca changed during the snapshot. Run the builder after its build finishes.'
++}
++Copy-Item -LiteralPath $NodePath -Destination (Join-Path $runtime 'node.exe') -Force
++Copy-Item -LiteralPath (Join-Path $OrcaRoot 'LICENSE.txt') -Destination (Join-Path $destination 'LICENSE.txt') -Force
++$versionText = Get-Content (Join-Path $OrcaRoot 'version.inc') -Raw
++$version = [regex]::Match($versionText, 'set\(SoftFever_VERSION "([^"]+)"\)').Groups[1].Value
++if (-not $version) { throw 'Could not read the Orca version.' }
++$revision = (& git -C $OrcaRoot rev-parse HEAD).Trim()
++$manifest = [ordered]@{
++    version = $version
++    source_revision_at_snapshot = $revision
++    source_directory = $OrcaRoot
++    orca_dll_sha256 = $copied
++    source_dll_modified_utc = (Get-Item $dll).LastWriteTimeUtc.ToString('o')
++    snapshot_utc = [DateTime]::UtcNow.ToString('o')
++    api_revision = (& git -C $apiRoot rev-parse HEAD).Trim()
++}
++$manifest | ConvertTo-Json | Set-Content (Join-Path $runtime 'build.json') -Encoding utf8
++New-Item -ItemType Directory -Force -Path (Join-Path $apiRoot 'data\tmp') | Out-Null
++$syncConfiguration = @()
++if (Test-Path (Join-Path $apiRoot '.env')) {
++    $syncConfiguration = @(Get-Content (Join-Path $apiRoot '.env') | Where-Object { $_ -match '^DESKTOP_(PROFILES_PATH|PROFILE_SYNC_TOKEN)=' })
++}
++@(
++    'NODE_ENV=production'
++    'HOST=127.0.0.1'
++    'PORT=3003'
++    "ORCASLICER_PATH=$($destination.Replace('\','/'))/orca-slicer.exe"
++    "ORCASLICER_VERSION=$version"
++    "BUNDLED_PROFILES_PATH=$($destination.Replace('\','/'))/resources/profiles/BBL"
++    "DATA_PATH=$($apiRoot.Replace('\','/'))/data"
++    'SLICER_FLAVOR=orca'
++    'MAX_MODEL_UPLOAD_MB=512'
++    'CORS_ORIGINS=http://127.0.0.1:8000'
++    $syncConfiguration
++) | Set-Content (Join-Path $apiRoot '.env') -Encoding utf8
++Push-Location $apiRoot
++try {
++    & $NodePath 'node_modules\typescript\bin\tsc'
++    if ($LASTEXITCODE -ne 0) { throw 'TypeScript build failed.' }
++    & $NodePath 'node_modules\tsc-esm-fix\target\esm\cli.mjs' 'dist'
++    if ($LASTEXITCODE -ne 0) { throw 'ES module path fix failed.' }
++} finally { Pop-Location }
++Write-Output "Built API with Orca $version; DLL SHA256 $copied"
+diff --git a/scripts/install-windows.ps1 b/scripts/install-windows.ps1
+new file mode 100644
+index 0000000..75efa8b
+--- /dev/null
++++ b/scripts/install-windows.ps1
+@@ -0,0 +1,19 @@
++$ErrorActionPreference = 'Stop'
++$apiRoot = Split-Path $PSScriptRoot -Parent
++$taskName = 'Bambuddy Orca API'
++$launcher = Join-Path $PSScriptRoot 'start-windows.ps1'
++$userId = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
++$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument (
++    '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $launcher + '" -Wait'
++) -WorkingDirectory $apiRoot
++$trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
++$principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Limited
++$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) `
++    -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
++    -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
++    -MultipleInstances IgnoreNew
++Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
++    -Principal $principal -Settings $settings -Description 'Orca API for local Bambuddy, using the custom Windows Orca build.' -Force | Out-Null
++& (Join-Path $PSScriptRoot 'stop-windows.ps1')
++Start-ScheduledTask -TaskName $taskName
++Write-Output "Installed '$taskName'; starts at logon for $userId."
+diff --git a/scripts/start-windows.ps1 b/scripts/start-windows.ps1
+new file mode 100644
+index 0000000..cac5395
+--- /dev/null
++++ b/scripts/start-windows.ps1
+@@ -0,0 +1,31 @@
++param([switch]$Wait)
++
++$ErrorActionPreference = 'Stop'
++$apiRoot = Split-Path $PSScriptRoot -Parent
++$runtime = Join-Path $apiRoot 'runtime'
++$node = Join-Path $runtime 'node.exe'
++$pidPath = Join-Path $runtime 'sidecar.pid'
++if (Test-Path $pidPath) {
++    $savedPid = [int](Get-Content $pidPath)
++    $existing = Get-CimInstance Win32_Process -Filter "ProcessId = $savedPid"
++    if ($existing -and $existing.ExecutablePath -eq $node) {
++        Write-Output "Orca API already running (PID $savedPid)."
++        if ($Wait) { Wait-Process -Id $savedPid; exit 1 }
++        exit 0
++    }
++}
++if (-not (Test-Path (Join-Path $apiRoot 'dist\src\index.js'))) { throw 'Build the API first.' }
++$logs = Join-Path $apiRoot 'logs'
++New-Item -ItemType Directory -Force -Path $logs | Out-Null
++$env:TEMP = Join-Path $apiRoot 'data\tmp'
++$env:TMP = $env:TEMP
++$child = Start-Process -FilePath $node -ArgumentList '--env-file=.env', 'dist/src/index.js' `
++    -WorkingDirectory $apiRoot -WindowStyle Hidden -PassThru `
++    -RedirectStandardOutput (Join-Path $logs 'sidecar.stdout.log') `
++    -RedirectStandardError (Join-Path $logs 'sidecar.stderr.log')
++$child.Id | Set-Content $pidPath
++Write-Output "Started Orca API (PID $($child.Id)); http://127.0.0.1:3003/health"
++if ($Wait) {
++    $child.WaitForExit()
++    exit $child.ExitCode
++}
+diff --git a/scripts/stop-windows.ps1 b/scripts/stop-windows.ps1
+new file mode 100644
+index 0000000..7d0d42b
+--- /dev/null
++++ b/scripts/stop-windows.ps1
+@@ -0,0 +1,12 @@
++$ErrorActionPreference = 'Stop'
++$apiRoot = Split-Path $PSScriptRoot -Parent
++$pidPath = Join-Path $apiRoot 'runtime\sidecar.pid'
++if (Test-Path $pidPath) {
++    $savedPid = [int](Get-Content $pidPath)
++    $existing = Get-CimInstance Win32_Process -Filter "ProcessId = $savedPid"
++    if ($existing -and $existing.ExecutablePath -eq (Join-Path $apiRoot 'runtime\node.exe')) {
++        Stop-Process -Id $savedPid
++        Write-Output "Stopped Orca API (PID $savedPid)."
++    }
++    Remove-Item -LiteralPath $pidPath
++}
+diff --git a/scripts/sync-desktop-profiles.py b/scripts/sync-desktop-profiles.py
+new file mode 100644
+index 0000000..2e4811e
+--- /dev/null
++++ b/scripts/sync-desktop-profiles.py
+@@ -0,0 +1,61 @@
++"""Copy desktop custom presets to Bambuddy using this sidecar's base profiles."""
++import argparse
++import json
++import urllib.request
++from pathlib import Path
++
++parser = argparse.ArgumentParser(description=__doc__)
++parser.add_argument('--source', type=Path, required=True, help='Orca user directory containing machine/process/filament folders')
++parser.add_argument('--api', default='http://127.0.0.1:3003')
++parser.add_argument('--bambuddy', default='http://127.0.0.1:8000')
++args = parser.parse_args()
++api_root = Path(__file__).resolve().parent.parent
++
++
++def request(url, data=None, method=None):
++    payload = None if data is None else json.dumps(data).encode()
++    req = urllib.request.Request(url, data=payload, method=method,
++        headers={'Content-Type': 'application/json'})
++    with urllib.request.urlopen(req, timeout=60) as response:
++        return json.load(response)
++
++
++existing = request(args.bambuddy.rstrip('/') + '/api/v1/local-presets/')
++by_name = {preset['name']: preset for values in existing.values() for preset in values}
++summary = []
++for category, preset_type, disk_category in (
++    ('machine', 'printer', 'printers'), ('process', 'process', 'presets'), ('filament', 'filament', 'filaments')
++):
++    folder = args.source / category
++    if not folder.is_dir():
++        raise RuntimeError(f'Missing desktop profile directory: {folder}')
++    for path in sorted(folder.rglob('*.json')):
++        raw = json.loads(path.read_text(encoding='utf-8-sig'))
++        if not raw.get('name'):
++            continue
++        resolved = request(args.api.rstrip('/') + '/profiles/resolve', {'category': category, 'profile': raw})['profile']
++        resolved['type'] = category
++        resolved.setdefault('from', 'system')
++        if category == 'machine' and not resolved.get('machine_start_gcode'):
++            raise RuntimeError(f'{raw["name"]}: no resolved start G-code')
++        if category == 'process' and not resolved.get('compatible_printers'):
++            raise RuntimeError(f'{raw["name"]}: no resolved compatible printer list')
++        previous = by_name.get(raw['name'])
++        base_url = args.bambuddy.rstrip('/') + '/api/v1/local-presets/'
++        if previous:
++            if previous['preset_type'] != preset_type:
++                raise RuntimeError(f'A preset with another type already uses {raw["name"]}')
++            saved = request(base_url + str(previous['id']), {'setting': resolved}, 'PUT')
++            action = 'updated'
++        else:
++            saved = request(base_url, {'name': raw['name'], 'preset_type': preset_type, 'setting': resolved}, 'POST')
++            by_name[raw['name']] = saved
++            action = 'created'
++        destination = api_root / 'data' / disk_category / path.name
++        destination.parent.mkdir(parents=True, exist_ok=True)
++        destination.write_text(json.dumps(resolved, indent=2), encoding='utf-8')
++        summary.append({'id': saved['id'], 'name': raw['name'], 'type': preset_type,
++                        'source': str(path), 'action': action, 'resolved_file': str(destination)})
++        print(f'{action}: {raw["name"]}', flush=True)
++(api_root / 'data' / 'desktop-profile-sync.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
++print(f'Synchronized {len(summary)} custom desktop profiles.')
+diff --git a/scripts/verify-slice.py b/scripts/verify-slice.py
+new file mode 100644
+index 0000000..8b025eb
+--- /dev/null
++++ b/scripts/verify-slice.py
+@@ -0,0 +1,78 @@
++"""Send a real Bambuddy-shaped multipart slice request, using stdlib only."""
++import argparse
++import io
++import json
++import time
++import urllib.error
++import urllib.request
++import uuid
++import zipfile
++from pathlib import Path
++
++parser = argparse.ArgumentParser(description=__doc__)
++parser.add_argument('--api', default='http://127.0.0.1:3003')
++parser.add_argument('--model', type=Path, required=True)
++parser.add_argument('--plate', default='1')
++parser.add_argument('--printer', type=Path)
++parser.add_argument('--process', type=Path)
++parser.add_argument('--filament', type=Path, action='append', default=[])
++parser.add_argument('--output', type=Path, required=True)
++args = parser.parse_args()
++if bool(args.printer) != bool(args.process):
++    parser.error('Pass both --printer and --process.')
++boundary = '----orca-api-' + uuid.uuid4().hex
++request_id = uuid.uuid4().hex
++parts = []
++
++
++def field(name, value):
++    parts.append((f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n').encode())
++
++
++def file(name, path, mime, filename):
++    parts.append((f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"; filename="{filename}"\r\nContent-Type: {mime}\r\n\r\n').encode())
++    parts.append(path.read_bytes())
++    parts.append(b'\r\n')
++
++
++file('file', args.model, 'model/3mf', args.model.name)
++if args.printer:
++    file('printerProfile', args.printer, 'application/json', 'printer.json')
++    file('presetProfile', args.process, 'application/json', 'preset.json')
++for idx, path in enumerate(args.filament):
++    file('filamentProfile', path, 'application/json', f'filament_{idx + 1}.json')
++field('plate', args.plate)
++field('exportType', '3mf')
++field('requestId', request_id)
++body = b''.join(parts) + f'--{boundary}--\r\n'.encode()
++request = urllib.request.Request(args.api.rstrip('/') + '/slice', data=body,
++    headers={'Content-Type': f'multipart/form-data; boundary={boundary}'}, method='POST')
++print(f'Slicing {args.model.name}, plate {args.plate}, {len(args.filament)} uploaded filament profiles', flush=True)
++started = time.monotonic()
++report = {'model': str(args.model), 'plate': args.plate, 'request_id': request_id,
++          'api': args.api, 'uploaded_profiles': bool(args.printer)}
++try:
++    with urllib.request.urlopen(request, timeout=600) as response:
++        result = response.read()
++        report.update(status=response.status, bytes=len(result), headers=dict(response.headers))
++except urllib.error.HTTPError as error:
++    report.update(status=error.code, error=error.read().decode('utf-8', 'replace'))
++    result = None
++report['elapsed_seconds'] = round(time.monotonic() - started, 2)
++if result is not None:
++    with zipfile.ZipFile(io.BytesIO(result)) as archive:
++        if archive.testzip() is not None:
++            raise RuntimeError('Corrupt output ZIP')
++        gcodes = [(entry.filename, entry.file_size) for entry in archive.infolist() if entry.filename.endswith('.gcode')]
++        if not gcodes or not all(size > 0 for _, size in gcodes):
++            raise RuntimeError('The response contains no G-code')
++        report['gcodes'] = gcodes
++        settings = json.loads(archive.read('Metadata/project_settings.config'))
++        report['settings'] = {key: settings.get(key) for key in
++            ('printer_model', 'printer_variant', 'nozzle_diameter', 'layer_height', 'print_settings_id', 'filament_settings_id')}
++    args.output.parent.mkdir(parents=True, exist_ok=True)
++    args.output.write_bytes(result)
++args.output.parent.mkdir(parents=True, exist_ok=True)
++args.output.with_suffix('.report.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
++print(json.dumps(report, indent=2), flush=True)
++raise SystemExit(0 if report.get('status') == 200 else 1)
+diff --git a/src/index.ts b/src/index.ts
+index edadf90..859841b 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -62,7 +62,8 @@ if (process.env.NODE_ENV !== "production") {
+ // through `vi.resetModules()` -- so the module-level listen raced its own
+ // earlier instances for port 3000 and printed "App listening" once per import.
+ if (process.env.NODE_ENV !== "test") {
+-  app.listen(port, () => {
+-    console.log(`App listening on port ${port}`);
++  const host = process.env.HOST || "0.0.0.0";
++  app.listen(Number(port), host, () => {
++    console.log(`App listening on ${host}:${port}`);
+   });
+ }
+diff --git a/src/routes/health/health.service.ts b/src/routes/health/health.service.ts
+index 18fbfdc..499b269 100644
+--- a/src/routes/health/health.service.ts
++++ b/src/routes/health/health.service.ts
+@@ -48,11 +48,14 @@ export async function checkHealth(): Promise<HealthCheck> {
+       const helpOutput = execFileSync(orcaPath, ["--help"], {
+         encoding: "utf-8",
+         timeout: 5000,
++        windowsHide: true,
+       });
+ 
+       // Extract version from output like "OrcaSlicer-2.3.1:" or "OrcaSlicer-01.10.01.50:"
+-      const versionMatch = helpOutput.match(/OrcaSlicer-([\d.]+)/);
+-      const version = versionMatch ? versionMatch[1] : "unknown";
++      const versionMatch = helpOutput.match(/OrcaSlicer-([\d.]+(?:-[\w.]+)?)/);
++      // Windows GUI executables can return an empty --help stream. The
++      // snapshot builder records the version of the copied Orca build.
++      const version = versionMatch?.[1] || process.env.ORCASLICER_VERSION || "unknown";
+       
+       checks.orcaslicer.available = true;
+       checks.orcaslicer.version = version;
+diff --git a/src/routes/profiles/desktop-sync.ts b/src/routes/profiles/desktop-sync.ts
+new file mode 100644
+index 0000000..3c1430c
+--- /dev/null
++++ b/src/routes/profiles/desktop-sync.ts
+@@ -0,0 +1,59 @@
++import fs from "node:fs/promises";
++import path from "node:path";
++import { timingSafeEqual } from "node:crypto";
++import { AppError } from "../../middleware/error";
++import { getDefaultBundledProfilesPath, resolveProfile, preserveCustomPresetIdentity, type ProfileCategory, type ProfileJson } from "../slicing/profile-resolver";
++
++export function authorizedSync(header: string | undefined, token: string | undefined): boolean {
++  if (!token || !header) return false;
++  const expected = Buffer.from(`Bearer ${token}`);
++  const supplied = Buffer.from(header);
++  return expected.length === supplied.length && timingSafeEqual(expected, supplied);
++}
++
++export async function desktopProfiles() {
++  const source = process.env.DESKTOP_PROFILES_PATH;
++  const bundledProfilesPath = getDefaultBundledProfilesPath();
++  if (!source || !bundledProfilesPath) throw new AppError(503, "Desktop profile sync is not configured.");
++  const root = await fs.realpath(source);
++  const data = process.env.DATA_PATH ?? "data";
++  let legacy: Array<{ id: number; source: string; name: string; type: string }> = [];
++  try { legacy = JSON.parse(await fs.readFile(path.join(data, "desktop-profile-sync.json"), "utf8")); }
++  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
++  const profiles: Array<{ key: string; name: string; preset_type: string; setting: ProfileJson; legacy_id?: number; disk: string; file: string }> = [];
++  for (const [category, presetType, disk] of [["machine", "printer", "printers"], ["process", "process", "presets"], ["filament", "filament", "filaments"]]) {
++    const dir = path.join(root, category);
++    const files = await fs.readdir(dir, { recursive: true });
++    for (const file of files.sort()) {
++      if (!file.endsWith(".json")) continue;
++      const absolute = await fs.realpath(path.join(dir, file));
++      if (!absolute.startsWith(root + path.sep)) throw new AppError(400, "Profile links must stay inside the desktop profile folder.");
++      const raw = JSON.parse((await fs.readFile(absolute, "utf8")).replace(/^\uFEFF/, "")) as ProfileJson;
++      if (typeof raw.name !== "string" || !raw.name) continue;
++      const setting = await resolveProfile(raw, category as ProfileCategory, { bundledProfilesPath });
++      preserveCustomPresetIdentity(setting, raw, category as ProfileCategory);
++      setting.type = category;
++      setting.from ??= "system";
++      if (category === "machine" && !setting.machine_start_gcode) throw new AppError(400, `${raw.name}: missing start G-code.`);
++      if (category === "process" && !setting.compatible_printers) throw new AppError(400, `${raw.name}: missing compatible printers.`);
++      const previous = legacy.find(p => path.resolve(p.source) === absolute && p.name === raw.name && p.type === presetType);
++      profiles.push({ key: `${category}/${file.replaceAll("\\", "/")}`, name: raw.name, preset_type: presetType, setting, legacy_id: previous?.id, disk, file });
++    }
++  }
++  if (!profiles.length) throw new AppError(400, "No saved desktop profiles were found.");
++  // Resolve every profile before touching any saved snapshot.
++  const backup = path.join(data, "profile-sync-backups", new Date().toISOString().replaceAll(":", "-"));
++  for (const p of profiles) {
++    const target = path.join(data, p.disk, p.file);
++    try {
++      const old = await fs.readFile(target);
++      const destination = path.join(backup, p.disk, p.file);
++      await fs.mkdir(path.dirname(destination), { recursive: true });
++      await fs.writeFile(destination, old);
++    } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
++    await fs.mkdir(path.dirname(target), { recursive: true });
++    await fs.writeFile(target + ".tmp", JSON.stringify(p.setting, null, 2));
++    await fs.rename(target + ".tmp", target);
++  }
++  return { profiles: profiles.map(p => ({ key: p.key, name: p.name, preset_type: p.preset_type, setting: p.setting, legacy_id: p.legacy_id })) };
++}
+diff --git a/src/routes/profiles/route.ts b/src/routes/profiles/route.ts
+index b18af78..bfd0506 100644
+--- a/src/routes/profiles/route.ts
++++ b/src/routes/profiles/route.ts
+@@ -19,11 +19,20 @@ import { AppError } from "../../middleware/error";
+ import {
+   getDefaultBundledProfilesPath,
+   resolveProfile,
++  preserveCustomPresetIdentity,
+   type ProfileCategory,
+   type ProfileJson,
+ } from "../slicing/profile-resolver";
+ 
+ const router = Router();
++import { authorizedSync, desktopProfiles } from "./desktop-sync";
++
++router.post("/desktop-sync", async (req, res) => {
++  if (!authorizedSync(req.header("Authorization"), process.env.DESKTOP_PROFILE_SYNC_TOKEN)) {
++    throw new AppError(403, "Desktop profile sync authentication failed.");
++  }
++  res.json(await desktopProfiles());
++});
+ 
+ // In-process cache for the bundled-profiles index. The bundle is read from the
+ // slicer's read-only `resources/profiles/BBL/` tree, which only changes when
+@@ -353,6 +362,7 @@ router.post("/resolve", async (req, res) => {
+     { bundledProfilesPath },
+   );
+ 
++  preserveCustomPresetIdentity(resolved, profile as ProfileJson, category as ProfileCategory);
+   res.status(200).json({ profile: resolved });
+ });
+ 
+diff --git a/src/routes/slicing/profile-resolver.ts b/src/routes/slicing/profile-resolver.ts
+index 06e23c8..40f1841 100644
+--- a/src/routes/slicing/profile-resolver.ts
++++ b/src/routes/slicing/profile-resolver.ts
+@@ -316,6 +316,29 @@ export function normalizeFromField(profile: ProfileJson): ProfileJson {
+   return profile;
+ }
+ 
++/** Keep a custom machine/process linked to the system preset it clones.
++ * The CLI accepts User for these two categories and compares `inherits`
++ * with the process's compatible_printers. Marking a renamed clone as
++ * system makes it compare the custom name instead and rejects a valid pair.
++ * Filament profiles still require the normalized system marker.
++ */
++export function preserveCustomPresetIdentity(
++  resolved: ProfileJson,
++  original: ProfileJson,
++  category: ProfileCategory,
++): ProfileJson {
++  if (
++    category !== "filament" &&
++    original.from === "User" &&
++    typeof original.inherits === "string" &&
++    original.inherits.length > 0
++  ) {
++    resolved.from = "User";
++    resolved.inherits = original.inherits;
++  }
++  return resolved;
++}
++
+ export function mergeProfiles(
+   parent: ProfileJson,
+   child: ProfileJson,
+diff --git a/src/routes/slicing/slicing.service.ts b/src/routes/slicing/slicing.service.ts
+index 114a7a0..1be6ca1 100644
+--- a/src/routes/slicing/slicing.service.ts
++++ b/src/routes/slicing/slicing.service.ts
+@@ -14,6 +14,7 @@ import {
+   ensureProfileType,
+   getDefaultBundledProfilesPath,
+   normalizeFromField,
++  preserveCustomPresetIdentity,
+   resolveProfile,
+   type ProfileCategory,
+   type ProfileJson,
+@@ -243,6 +244,10 @@ export async function sliceModel(
+   let progressReader: { close: () => void } | undefined;
+   if (requestId) {
+     progressStore.start(requestId);
++  }
++  // Orca's --pipe implementation is compiled only on Linux. Windows still
++  // publishes the initial and terminal request state, without creating a FIFO.
++  if (requestId && process.platform !== "win32") {
+     fifoPath = path.join(workdir, `progress.fifo`);
+     try {
+       // mkfifo isn't in node's fs API; shell out via the busybox/util-linux
+@@ -266,6 +271,10 @@ export async function sliceModel(
+         // Inherit env so DISPLAY / XDG_* etc. (used by some slicer plugins)
+         // remain consistent with the previous execFile invocation.
+         env: process.env,
++        windowsHide: true,
++        // Windows Orca writes 00000.log in its working directory. Isolate
++        // that file per request so simultaneous slices have separate logs.
++        cwd: workdir,
+       });
+       // Buffer stdout/stderr — same 16MB cap the old execFile path used.
+       const STDOUT_LIMIT = 16 * 1024 * 1024;
+@@ -300,6 +309,14 @@ export async function sliceModel(
+   } catch (err) {
+     if (progressReader) progressReader.close();
+     if (requestId) progressStore.finish(requestId);
++    if (process.platform === "win32") {
++      try {
++        const log = await fs.readFile(path.join(workdir, "00000.log"), "utf-8");
++        cliStderr += `\nOrca CLI log:\n${log.slice(-4000)}`;
++      } catch {
++        // A launch failure may occur before Orca creates its log.
++      }
++    }
+     const resultJsonPath = path.join(outputDir, "result.json");
+     let json;
+     try {
+@@ -668,6 +685,7 @@ async function materializeProfile(
+     );
+   }
+ 
++  const originalProfile = { ...profile };
+   if (typeof profile.inherits === "string" && profile.inherits.length > 0) {
+     if (!args.bundledProfilesPath) {
+       throw new AppError(
+@@ -683,6 +701,7 @@ async function materializeProfile(
+ 
+   ensureProfileType(profile, args.category);
+   normalizeFromField(profile);
++  preserveCustomPresetIdentity(profile, originalProfile, args.category);
+ 
+   const outPath = path.join(args.inputDir, args.filename);
+   try {
+diff --git a/tests/unit/desktop-sync.spec.ts b/tests/unit/desktop-sync.spec.ts
+new file mode 100644
+index 0000000..ccc07c9
+--- /dev/null
++++ b/tests/unit/desktop-sync.spec.ts
+@@ -0,0 +1,32 @@
++import { afterEach, describe, expect, it } from "vitest";
++import fs from "node:fs/promises";
++import os from "node:os";
++import path from "node:path";
++import { authorizedSync, desktopProfiles } from "../../src/routes/profiles/desktop-sync";
++
++const roots: string[] = [];
++const original = { ...process.env };
++afterEach(async () => {
++  process.env = { ...original };
++  for (const root of roots.splice(0)) await fs.rm(root, { recursive: true, force: true });
++});
++
++describe("desktop profile sync", () => {
++  it("requires the configured bearer token", () => {
++    expect(authorizedSync(undefined, undefined)).toBe(false);
++    expect(authorizedSync("Bearer wrong", "secret")).toBe(false);
++    expect(authorizedSync("Bearer secret", "secret")).toBe(true);
++  });
++  it("does not write snapshots when any desktop profile is invalid", async () => {
++    const root = await fs.mkdtemp(path.join(os.tmpdir(), "orca-sync-test-"));
++    roots.push(root);
++    process.env.DESKTOP_PROFILES_PATH = root;
++    process.env.BUNDLED_PROFILES_PATH = root;
++    process.env.DATA_PATH = path.join(root, "output");
++    for (const category of ["machine", "process", "filament"]) await fs.mkdir(path.join(root, category));
++    await fs.writeFile(path.join(root, "machine", "printer.json"), JSON.stringify({ name: "Printer", machine_start_gcode: "G28" }));
++    await fs.writeFile(path.join(root, "process", "broken.json"), "{broken");
++    await expect(desktopProfiles()).rejects.toThrow();
++    await expect(fs.stat(path.join(root, "output", "printers"))).rejects.toThrow();
++  });
++});
+diff --git a/tests/unit/profile-resolver.spec.ts b/tests/unit/profile-resolver.spec.ts
+index 5cc1cd9..a771643 100644
+--- a/tests/unit/profile-resolver.spec.ts
++++ b/tests/unit/profile-resolver.spec.ts
+@@ -6,11 +6,37 @@ import {
+   ensureProfileType,
+   mergeProfiles,
+   normalizeFromField,
++  preserveCustomPresetIdentity,
+   resolveProfile,
+   getDefaultBundledProfilesPath,
+   type ProfileJson,
+ } from "../../src/routes/slicing/profile-resolver";
+ 
++describe("preserveCustomPresetIdentity", () => {
++  it.each(["machine", "process"] as const)("keeps a renamed %s linked to its system parent", (category) => {
++    const original = { name: "Custom preset", from: "User", inherits: "Stock preset" };
++    const resolved = { name: "Custom preset", from: "system", layer_height: "0.24" };
++    const result = preserveCustomPresetIdentity(resolved, original, category);
++    expect(result.name).toBe("Custom preset");
++    expect(result.from).toBe("User");
++    expect(result.inherits).toBe("Stock preset");
++    expect(result.layer_height).toBe("0.24");
++  });
++
++  it("keeps the required system marker on a flattened filament", () => {
++    const original = { from: "User", inherits: "Stock filament" };
++    const result = preserveCustomPresetIdentity({ from: "system" }, original, "filament");
++    expect(result.from).toBe("system");
++    expect(result.inherits).toBeUndefined();
++  });
++
++  it("leaves a stock preset flattened", () => {
++    const original = { from: "system", inherits: "Stock template" };
++    const result = preserveCustomPresetIdentity({ from: "system" }, original, "machine");
++    expect(result.inherits).toBeUndefined();
++  });
++});
++
+ describe("mergeProfiles", () => {
+   it("child fields override parent fields key-by-key", () => {
+     const parent: ProfileJson = { foo: "parent", bar: "kept" };

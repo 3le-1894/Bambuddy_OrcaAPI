@@ -8121,6 +8121,12 @@ export const api = {
     ),
 
   // Local Presets (OrcaSlicer imports)
+  getDesktopProfileSyncStatus: () =>
+    request<{ synced_at: string | null }>('/local-presets/desktop-sync/status'),
+  syncDesktopProfiles: () =>
+    request<{ added: number; updated: number; unchanged: number; conflicts: string[]; missing: string[]; synced_at: string }>(
+      '/local-presets/desktop-sync', { method: 'POST' },
+    ),
   getLocalPresets: () =>
     request<LocalPresetsResponse>('/local-presets/'),
   getLocalPresetDetail: (id: number) =>

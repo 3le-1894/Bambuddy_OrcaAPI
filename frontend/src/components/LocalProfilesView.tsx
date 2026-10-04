@@ -227,6 +227,27 @@ export function LocalProfilesView() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [syncSummary, setSyncSummary] = useState<string | null>(null);
+  const { data: syncStatus } = useQuery({
+    queryKey: ['desktopProfileSyncStatus'],
+    queryFn: () => api.getDesktopProfileSyncStatus(),
+  });
+  const syncMutation = useMutation({
+    mutationFn: () => api.syncDesktopProfiles(),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['localPresets'] });
+      queryClient.invalidateQueries({ queryKey: ['slicerPresets'] });
+      queryClient.invalidateQueries({ queryKey: ['desktopProfileSyncStatus'] });
+      const summary = t('profiles.localProfiles.desktopSync.result', '{{updated}} updated, {{added}} added, {{unchanged}} unchanged.', result);
+      const notes = [
+        result.conflicts.length ? t('profiles.localProfiles.desktopSync.conflicts', 'Kept conflicting Bambuddy profiles: {{names}}.', { names: result.conflicts.join(', ') }) : '',
+        result.missing.length ? t('profiles.localProfiles.desktopSync.missing', 'Kept profiles no longer found on desktop: {{names}}.', { names: result.missing.join(', ') }) : '',
+      ].filter(Boolean).join(' ');
+      setSyncSummary(`${summary} ${notes}`.trim());
+      showToast(summary, result.conflicts.length ? 'warning' : 'success');
+    },
+    onError: (error: Error) => showToast(error.message, 'error'),
+  });
 
   const { data: presets, isLoading } = useQuery({
     queryKey: ['localPresets'],
@@ -347,6 +368,23 @@ export function LocalProfilesView() {
 
   return (
     <div className="space-y-6">
+      {hasPermission('settings:update') && (
+        <div className="rounded-lg border border-bambu-dark-tertiary p-4 space-y-2">
+          <Button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending || importMutation.isPending}>
+            {syncMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+            {syncMutation.isPending
+              ? t('profiles.localProfiles.desktopSync.running', 'Syncing desktop profiles…')
+              : t('profiles.localProfiles.desktopSync.button', 'Sync desktop Orca profiles')}
+          </Button>
+          <p className="text-sm text-bambu-gray">
+            {t('profiles.localProfiles.desktopSync.hint', 'Save your profiles in desktop Orca first. Sync updates the profiles on this Bambuddy host and its slicer sidecar.')}
+          </p>
+          {syncStatus?.synced_at && <p className="text-xs text-bambu-gray">
+            {t('profiles.localProfiles.desktopSync.last', 'Last sync: {{time}}', { time: new Date(syncStatus.synced_at).toLocaleString() })}
+          </p>}
+          {syncSummary && <p className="text-sm text-white" role="status">{syncSummary}</p>}
+        </div>
+      )}
       {/* Import Zone */}
       {hasPermission('settings:update') && (
         <div

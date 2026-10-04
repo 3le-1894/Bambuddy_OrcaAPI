@@ -34,6 +34,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/local-presets", tags=["Local Presets"])
 
 
+@router.get("/desktop-sync/status")
+async def desktop_sync_status(
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.SETTINGS_READ),
+    db: AsyncSession = Depends(get_db),
+):
+    from backend.app.services.desktop_profile_sync import sync_status
+
+    return await sync_status(db)
+
+
+@router.post("/desktop-sync")
+async def desktop_sync(
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.SETTINGS_UPDATE),
+    db: AsyncSession = Depends(get_db),
+):
+    from backend.app.services.desktop_profile_sync import sync_desktop_profiles
+
+    return await sync_desktop_profiles(db)
+
+
 @router.get("/", response_model=LocalPresetsResponse)
 async def list_local_presets(
     _: User | None = RequirePermissionIfAuthEnabled(Permission.SETTINGS_READ),
