@@ -1824,6 +1824,10 @@ async def run_migrations(conn):
     """
     from sqlalchemy import text
 
+    from backend.app.core.printer_connection_migration import migrate_printer_connections
+
+    await migrate_printer_connections(conn)
+
     # Existing PostgreSQL databases predate the finance ORM tables. These must
     # exist before any ALTER TABLE / CREATE INDEX statements below reference
     # them. Fresh installs remain idempotent because create_all() runs first.

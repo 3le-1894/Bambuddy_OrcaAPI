@@ -1,3 +1,5 @@
+import { PrinterConnectionFields } from '../components/PrinterConnectionFields';
+import { connectionPayload } from '../utils/printerConnection';
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { compareFwVersions } from '../utils/firmwareVersion';
@@ -2031,7 +2033,46 @@ function ScheduledDryingBanner({ printerId, dryingActive, timeFormat }: { printe
   );
 }
 
-function PrinterCard({
+function PrinterCard(props: React.ComponentProps<typeof BambuPrinterCard>) {
+  if (props.printer.connection_type && props.printer.connection_type !== 'bambu') {
+    return <ConfiguredPrinterCard printer={props.printer} />;
+  }
+  return <BambuPrinterCard {...props} />;
+}
+
+function ConfiguredPrinterCard({ printer }: { printer: Printer }) {
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
+  const { showToast } = useToast();
+  const deletion = useMutation({
+    mutationFn: () => api.deletePrinter(printer.id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['printers'] }),
+    onError: (error: Error) => showToast(error.message, 'error'),
+  });
+  return <>
+    <Card><CardContent>
+      <h3 className="font-semibold">{printer.name}</h3>
+      <p className="text-sm text-bambu-gray">{printer.connection_type === 'klipper' ? 'Klipper / Moonraker' : 'Duet / RRF'}</p>
+      <p className="text-sm break-all mt-2">{printer.api_url}</p>
+      <p className="text-sm text-amber-400 mt-2">Configuration only — adapter not yet available</p>
+      {printer.location && <p className="text-sm text-bambu-gray">{printer.location}</p>}
+      <div className="flex gap-2 mt-4">
+        {hasPermission('printers:update') && <Button onClick={() => setEditing(true)}>Edit configuration</Button>}
+        {hasPermission('printers:delete') && <Button variant="secondary" onClick={() => setConfirmDelete(true)}>Remove</Button>}
+      </div>
+      {confirmDelete && <div className="mt-3 space-y-2">
+        <p>Remove this printer configuration?</p>
+        <Button disabled={deletion.isPending} onClick={() => deletion.mutate()}>Confirm removal</Button>
+        <Button variant="secondary" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+      </div>}
+    </CardContent></Card>
+    {editing && <EditPrinterModal printer={printer} onClose={() => setEditing(false)} />}
+  </>;
+}
+
+function BambuPrinterCard({
   printer,
   hideIfDisconnected,
   maintenanceInfo,
@@ -7658,6 +7699,8 @@ export function AddPrinterModal({
 }) {
   const { t } = useTranslation();
   const [form, setForm] = useState<PrinterCreate>({
+    connection_type: 'bambu',
+    auth_mode: 'none',
     name: '',
     serial_number: '',
     ip_address: '',
@@ -7717,6 +7760,10 @@ export function AddPrinterModal({
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (form.connection_type && form.connection_type !== 'bambu') {
+      onAdd(connectionPayload(form));
+      return;
+    }
     setCheckingSave(true);
     try {
       const result = await api.diagnoseConnection({
@@ -7864,6 +7911,7 @@ export function AddPrinterModal({
           <h2 className="text-xl font-semibold mb-4">{t('printers.addPrinter')}</h2>
 
           {/* Discovery Section */}
+          {form.connection_type === 'bambu' && <>
           <div className="mb-4 pb-4 border-b border-bambu-dark-tertiary">
             {/* Subnet picker — always visible. The dropdown lists detected
                 interface subnets and a "Custom..." sentinel that reveals
@@ -7990,7 +8038,9 @@ export function AddPrinterModal({
               </p>
             )}
           </div>
+          </>}
           <form onSubmit={handleAddSubmit} className="space-y-4">
+            <PrinterConnectionFields value={form} onChange={next => { setForm({ ...form, ...next }); setSaveWarning(null); }} />
             <div>
               <label className="block text-sm text-bambu-gray mb-1">{t('printers.name')}</label>
               <input
@@ -8002,6 +8052,7 @@ export function AddPrinterModal({
                 placeholder={t('printers.modal.myPrinter')}
               />
             </div>
+            {(!form.connection_type || form.connection_type === 'bambu') && <>
             <div>
               <label className="block text-sm text-bambu-gray mb-1">{t('printers.ipAddress')}</label>
               <input
@@ -8072,6 +8123,11 @@ export function AddPrinterModal({
                 </optgroup>
               </select>
             </div>
+            </>}
+            {form.connection_type && form.connection_type !== 'bambu' && <div>
+              <label className="block text-sm text-bambu-gray mb-1">Model (optional)</label>
+              <input className="w-full px-3 py-2 bg-bambu-dark border border-bambu-dark-tertiary rounded-lg text-white" value={form.model || ''} onChange={event => setForm({ ...form, model: event.target.value })} />
+            </div>}
             <div>
               <label className="block text-sm text-bambu-gray mb-1">{t('printers.modal.locationGroup')}</label>
               <input
@@ -8098,7 +8154,7 @@ export function AddPrinterModal({
             <button
               type="button"
               onClick={() => setShowDiagnostic(true)}
-              disabled={!form.ip_address.trim()}
+              disabled={form.connection_type !== 'bambu' || !form.ip_address.trim()}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-bambu-gray hover:text-white disabled:opacity-40 disabled:cursor-not-allowed border border-bambu-dark-tertiary rounded-lg transition-colors"
             >
               <Stethoscope className="w-4 h-4" />
@@ -8445,6 +8501,11 @@ function EditPrinterModal({
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [form, setForm] = useState({
+    connection_type: printer.connection_type || 'bambu',
+    api_url: printer.api_url || '',
+    auth_mode: printer.auth_mode || 'none',
+    duet_mode: printer.duet_mode || null,
+    connection_secret: '',
     name: printer.name,
     ip_address: printer.ip_address,
     access_code: '',
@@ -8487,6 +8548,13 @@ function EditPrinterModal({
       auto_archive: form.auto_archive,
       is_active: form.is_active,
     };
+    if (form.connection_type !== 'bambu') {
+      delete data.ip_address;
+      data.api_url = form.api_url;
+      data.auth_mode = form.auth_mode;
+      data.duet_mode = form.duet_mode;
+      if (form.connection_secret) data.connection_secret = form.connection_secret;
+    }
     // Only include access_code if it was changed
     if (form.access_code) {
       data.access_code = form.access_code;
@@ -8496,6 +8564,7 @@ function EditPrinterModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (form.connection_type !== 'bambu') { doSave(); return; }
     setCheckingSave(true);
     try {
       const result = await api.diagnoseConnection({
@@ -8524,6 +8593,7 @@ function EditPrinterModal({
         <CardContent>
           <h2 className="text-xl font-semibold mb-4">{t('printers.editPrinter')}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <PrinterConnectionFields value={form} editing hasSecret={printer.has_connection_secret} onChange={next => setForm({ ...form, ...next, connection_type: next.connection_type || 'bambu', api_url: next.api_url || '', auth_mode: next.auth_mode || 'none', duet_mode: next.duet_mode || null, connection_secret: next.connection_secret || '' })} />
             <div>
               <label className="block text-sm text-bambu-gray mb-1">{t('printers.name')}</label>
               <input
@@ -8535,6 +8605,7 @@ function EditPrinterModal({
                 placeholder={t('printers.modal.myPrinter')}
               />
             </div>
+            {form.connection_type === 'bambu' && <>
             <div>
               <label className="block text-sm text-bambu-gray mb-1">{t('printers.ipAddress')}</label>
               <input
@@ -8603,6 +8674,11 @@ function EditPrinterModal({
                 </optgroup>
               </select>
             </div>
+            </>}
+            {form.connection_type !== 'bambu' && <div>
+              <label className="block text-sm text-bambu-gray mb-1">Model (optional)</label>
+              <input className="w-full px-3 py-2 bg-bambu-dark border border-bambu-dark-tertiary rounded-lg text-white" value={form.model} onChange={event => setForm({ ...form, model: event.target.value })} />
+            </div>}
             <div>
               <label className="block text-sm text-bambu-gray mb-1">Location / Group</label>
               <input
@@ -8634,6 +8710,7 @@ function EditPrinterModal({
                 <input
                   type="checkbox"
                   id="edit_maintenance_mode"
+                  disabled={form.connection_type !== 'bambu'}
                   checked={!form.is_active}
                   onChange={(e) => setForm({ ...form, is_active: !e.target.checked })}
                   className="rounded border-bambu-dark-tertiary bg-bambu-dark text-amber-400 focus:ring-amber-400"

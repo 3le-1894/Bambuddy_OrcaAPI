@@ -430,6 +430,12 @@ export interface OverlayStatus {
 
 // Printer types
 export interface Printer {
+  connection_type?: 'bambu' | 'klipper' | 'duet';
+  api_url?: string | null;
+  auth_mode?: 'none' | 'api_key' | 'password';
+  duet_mode?: 'standalone' | 'sbc' | null;
+  has_connection_secret?: boolean;
+  connection_supported?: boolean;
   id: number;
   name: string;
   serial_number: string;
@@ -742,6 +748,11 @@ export interface PrinterStatus {
 }
 
 export interface PrinterCreate {
+  connection_type?: 'bambu' | 'klipper' | 'duet';
+  api_url?: string | null;
+  auth_mode?: 'none' | 'api_key' | 'password';
+  duet_mode?: 'standalone' | 'sbc' | null;
+  connection_secret?: string | null;
   name: string;
   serial_number: string;
   ip_address: string;

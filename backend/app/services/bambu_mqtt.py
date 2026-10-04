@@ -1532,6 +1532,11 @@ class BambuMQTTClient:
         """
         return self._report_messages_since_connect
 
+    @property
+    def last_seen_at(self) -> float | None:
+        """UTC Unix timestamp of the last report message, if one was received."""
+        return self._last_message_time or None
+
     # Maximum time (seconds) without a message before considering connection stale
     STALE_TIMEOUT = 60.0
 

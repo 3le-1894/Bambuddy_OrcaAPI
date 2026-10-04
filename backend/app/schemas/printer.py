@@ -1,17 +1,52 @@
 from datetime import datetime
+from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from backend.app.utils.printer_models import supports_nozzle_flow_type
 
+ConnectionType = Literal["bambu", "klipper", "duet"]
+AuthMode = Literal["none", "api_key", "password"]
+DuetMode = Literal["standalone", "sbc"]
+
+
+def validate_printer_api_url(value: str | None) -> str | None:
+    if value is None or not value.strip():
+        return None
+    value = value.strip()
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        raise ValueError("Invalid printer server URL") from None
+    if (
+        parsed.scheme not in ("http", "https")
+        or not parsed.hostname
+        or any(ch.isspace() for ch in value)
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or port == 0
+    ):
+        raise ValueError("Use an HTTP(S) server URL without credentials, query parameters or fragments")
+    return value.rstrip("/")
+
 
 class PrinterBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    serial_number: str = Field(..., min_length=1, max_length=50)
+    connection_type: ConnectionType = "bambu"
+    api_url: str | None = Field(default=None, max_length=500)
+    auth_mode: AuthMode = "none"
+    duet_mode: DuetMode | None = None
+    serial_number: str | None = Field(default=None, max_length=50)
+
+    _validate_api_url = field_validator("api_url")(validate_printer_api_url)
 
     @field_validator("serial_number")
     @classmethod
-    def _normalize_serial_number(cls, v: str) -> str:
+    def _normalize_serial_number(cls, v: str | None) -> str | None:
         """Uppercase and trim the serial number.
 
         Bambu serial numbers are uppercase alphanumeric, and the MQTT report
@@ -21,13 +56,10 @@ class PrinterBase(BaseModel):
         the correctly-cased topic, so every status field stays unknown (#1465).
         Normalising on input makes the subscribed topic always match.
         """
-        normalized = v.strip().upper()
-        if not normalized:
-            raise ValueError("serial_number must not be blank")
-        return normalized
+        return v.strip().upper() or None if v is not None else None
 
-    ip_address: str = Field(
-        ...,
+    ip_address: str | None = Field(
+        default=None,
         max_length=253,
         pattern=r"^(\d{1,3}(\.\d{1,3}){3}|[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*)$",
     )
@@ -45,7 +77,38 @@ class PrinterCreate(PrinterBase):
     # access_code lives on the input shapes only — never on the default
     # PrinterResponse. Direct exposure on PRINTERS_READ would let a Viewer
     # connect to the printer's MQTT and bypass Bambuddy's RBAC.
-    access_code: str = Field(..., min_length=1, max_length=20)
+    access_code: str | None = Field(default=None, min_length=1, max_length=20)
+    connection_secret: str | None = Field(default=None, max_length=1000, exclude=True, repr=False)
+
+    @field_validator("access_code", "ip_address", mode="before")
+    @classmethod
+    def empty_legacy_inputs(cls, value):
+        return None if value == "" else value
+
+    @model_validator(mode="after")
+    def validate_connection(self):
+        if self.connection_type == "bambu":
+            if not self.serial_number or not self.ip_address or not self.access_code:
+                raise ValueError("Bambu printers require an address, serial number and access code")
+            if self.api_url or self.auth_mode != "none" or self.duet_mode or self.connection_secret:
+                raise ValueError("HTTP connection settings do not apply to Bambu printers")
+        else:
+            if not self.api_url:
+                raise ValueError("A printer server URL is required")
+            if self.serial_number or self.access_code or self.ip_address:
+                raise ValueError("Use server URL and authentication fields for non-Bambu printers")
+            allowed = {"none", "api_key"} if self.connection_type == "klipper" else {"none", "password"}
+            if self.auth_mode not in allowed:
+                raise ValueError("Authentication mode does not match the connection type")
+            if self.auth_mode != "none" and not self.connection_secret:
+                raise ValueError("A credential is required for the selected authentication mode")
+            if self.auth_mode == "none" and self.connection_secret:
+                raise ValueError("No-auth connections must not include a credential")
+            if self.connection_type == "duet":
+                self.duet_mode = self.duet_mode or "standalone"
+            elif self.duet_mode is not None:
+                raise ValueError("Duet mode applies only to Duet connections")
+        return self
 
 
 class PlateDetectionROI(BaseModel):
@@ -58,6 +121,12 @@ class PlateDetectionROI(BaseModel):
 
 
 class PrinterUpdate(BaseModel):
+    connection_type: ConnectionType | None = None
+    api_url: str | None = Field(default=None, max_length=500)
+    auth_mode: AuthMode | None = None
+    duet_mode: DuetMode | None = None
+    connection_secret: str | None = Field(default=None, max_length=1000, exclude=True, repr=False)
+    _validate_api_url = field_validator("api_url")(validate_printer_api_url)
     name: str | None = None
     ip_address: str | None = Field(
         default=None,
@@ -80,6 +149,22 @@ class PrinterUpdate(BaseModel):
 
 
 class PrinterResponse(PrinterBase):
+    # Empty legacy display fields keep existing Bambu UI consumers compatible.
+    serial_number: str = ""
+    ip_address: str = ""
+    has_connection_secret: bool = False
+    connection_supported: bool = True
+
+    @field_validator("serial_number", "ip_address", mode="before")
+    @classmethod
+    def empty_legacy_fields(cls, value):
+        return value or ""
+
+    @field_validator("serial_number")
+    @classmethod
+    def _normalize_serial_number(cls, value):
+        return value.strip().upper()
+
     id: int
     is_active: bool
     nozzle_count: int = 1  # 1 or 2, auto-detected from MQTT
@@ -110,6 +195,12 @@ class PrinterResponse(PrinterBase):
             "name": printer.name,
             "serial_number": printer.serial_number,
             "ip_address": printer.ip_address,
+            "connection_type": getattr(printer, "connection_type", "bambu"),
+            "api_url": getattr(printer, "api_url", None),
+            "auth_mode": getattr(printer, "auth_mode", "none"),
+            "duet_mode": getattr(printer, "duet_mode", None),
+            "has_connection_secret": bool(getattr(printer, "has_connection_secret", False)),
+            "connection_supported": getattr(printer, "connection_supported", True),
             "model": printer.model,
             "location": printer.location,
             "auto_archive": printer.auto_archive,
@@ -153,7 +244,7 @@ class PrinterResponseWithSecret(PrinterResponse):
     the caller talk to the printer's MQTT directly and bypass Bambuddy's RBAC.
     """
 
-    access_code: str
+    access_code: str | None
 
 
 class HMSErrorResponse(BaseModel):

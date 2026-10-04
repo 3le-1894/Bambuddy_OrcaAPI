@@ -3,17 +3,25 @@ import logging
 import re
 import traceback
 from collections.abc import Callable
+from dataclasses import replace
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.models.printer import Printer
+from backend.app.services.bambu_adapter import BambuPrinterAdapter
 from backend.app.services.bambu_mqtt import (
     STAGE_NAMES,
     BambuMQTTClient,
     MQTTLogEntry,
     PrinterState,
     get_stage_name,
+)
+from backend.app.services.printer_adapter import (
+    FleetPrinterStatus,
+    ManagedPrinterAdapter,
+    PrinterAdapter,
+    PrinterReadiness,
 )
 from backend.app.utils.ams_humidity import ams_humidity_percent
 from backend.app.utils.kprofile_lookup import build_slot_k_resolver
@@ -386,6 +394,8 @@ class PrinterManager:
 
     def __init__(self):
         self._clients: dict[int, BambuMQTTClient] = {}
+        self._fleet_adapters: dict[int, ManagedPrinterAdapter] = {}
+        self._fleet_adapter_lock = asyncio.Lock()
         self._models: dict[int, str | None] = {}  # Cache printer models for feature detection
         self._printer_info: dict[int, PrinterInfo] = {}  # Cache printer name/serial for callbacks
         # Last AMS / external-spool reading of a printer whose client has been
@@ -741,6 +751,10 @@ class PrinterManager:
 
     async def connect_printer(self, printer: Printer) -> bool:
         """Connect to a printer."""
+        if getattr(printer, "connection_type", "bambu") in ("klipper", "duet"):
+            return False  # Configuration-only until the corresponding transport is implemented.
+        if printer.id in self._fleet_adapters:
+            await self.unregister_fleet_adapter(printer.id)
         if printer.id in self._clients:
             self.disconnect_printer(printer.id)
 
@@ -904,6 +918,75 @@ class PrinterManager:
     def get_client(self, printer_id: int) -> BambuMQTTClient | None:
         """Get the MQTT client for a printer."""
         return self._clients.get(printer_id)
+
+    def get_adapter(self, printer_id: int) -> PrinterAdapter | None:
+        """Get a fleet adapter over the current manager-owned connection.
+
+        Construct on access so reconnects never leave a cached wrapper pointing
+        at a retired MQTT client. Legacy get_client/get_status remain unchanged.
+        """
+        adapter = self._fleet_adapters.get(printer_id)
+        if adapter is not None:
+            return adapter
+        client = self._clients.get(printer_id)
+        if client is None:
+            return None
+        return BambuPrinterAdapter(client, chamber_sensor=supports_chamber_temp(self.get_model(printer_id)))
+
+    async def register_fleet_adapter(self, printer_id: int, adapter: ManagedPrinterAdapter) -> None:
+        """Own a new transport and start background refresh without network waits.
+
+        Non-Bambu transports use this registry, never the Bambu _clients map:
+        legacy status APIs may invoke Bambu-specific session recovery.
+        """
+        async with self._fleet_adapter_lock:
+            if printer_id in self._clients:
+                raise ValueError("Disconnect the Bambu client before registering a fleet adapter")
+            old = self._fleet_adapters.pop(printer_id, None)
+            if old is not None:
+                await old.stop()
+            try:
+                await adapter.start()
+            except BaseException:
+                await adapter.stop()
+                raise
+            self._fleet_adapters[printer_id] = adapter
+
+    async def unregister_fleet_adapter(self, printer_id: int) -> None:
+        """Stop and await a retired transport before reusing its printer ID."""
+        async with self._fleet_adapter_lock:
+            adapter = self._fleet_adapters.pop(printer_id, None)
+            if adapter is not None:
+                await adapter.stop()
+
+    async def shutdown_fleet_adapters(self) -> None:
+        """Release all managed transports during application shutdown."""
+        async with self._fleet_adapter_lock:
+            adapters = list(self._fleet_adapters.values())
+            self._fleet_adapters.clear()
+            results = await asyncio.gather(*(adapter.stop() for adapter in adapters), return_exceptions=True)
+            for result in results:
+                if isinstance(result, BaseException):
+                    logger.warning("Fleet adapter shutdown failed (%s)", type(result).__name__)
+
+    def get_fleet_status(self, printer_id: int) -> FleetPrinterStatus | None:
+        """Return common telemetry plus the farm's plate-clearance gate."""
+        adapter = self.get_adapter(printer_id)
+        if adapter is None:
+            return None
+        status = adapter.get_status()
+        if status.readiness == PrinterReadiness.READY and self.is_awaiting_plate_clear(printer_id):
+            status = replace(status, readiness=PrinterReadiness.AWAITING_CLEARANCE)
+        return status
+
+    def get_all_fleet_statuses(self) -> dict[int, FleetPrinterStatus]:
+        """Snapshot all currently registered connections for fleet consumers."""
+        result = {}
+        for printer_id in list(self._clients.keys() | self._fleet_adapters.keys()):
+            status = self.get_fleet_status(printer_id)
+            if status is not None:
+                result[printer_id] = status
+        return result
 
     def mark_printer_offline(self, printer_id: int):
         """Mark a printer as offline and trigger status callback.

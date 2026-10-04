@@ -5,8 +5,9 @@ import secrets
 import zipfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
@@ -99,7 +100,28 @@ from backend.app.utils.kprofile_lookup import build_slot_k_resolver
 from backend.app.utils.printer_models import MAX_CHAMBER_TEMP_C, uses_exhaust_fan_label
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/printers", tags=["printers"])
+
+
+async def require_available_printer_transport(request: Request, db: AsyncSession = Depends(get_db)):
+    """Keep configuration-only records out of legacy MQTT/FTP/control routes."""
+    printer_id = request.path_params.get("printer_id")
+    if printer_id is None:
+        return
+    route = request.scope.get("route")
+    if getattr(route, "name", "") in {"get_printer", "update_printer", "delete_printer", "get_printer_status"}:
+        return
+    try:
+        printer_id = int(printer_id)
+    except ValueError:
+        return  # Standard FastAPI path validation owns the 422.
+    connection_type = (
+        await db.execute(select(Printer.connection_type).where(Printer.id == printer_id))
+    ).scalar_one_or_none()
+    if connection_type in ("klipper", "duet"):
+        raise HTTPException(409, "This connection type is configuration-only until its adapter is implemented")
+
+
+router = APIRouter(prefix="/printers", tags=["printers"], dependencies=[Depends(require_available_printer_transport)])
 
 # Seconds the /hms/execute-action route waits for a printer status push
 # confirming the command landed before reporting 502 to the UI. Module-level
@@ -168,14 +190,19 @@ async def create_printer(
     access code.
     """
     # Check if serial number already exists
-    result = await db.execute(select(Printer).where(Printer.serial_number == printer_data.serial_number))
-    if result.scalar_one_or_none():
-        raise HTTPException(400, "Printer with this serial number already exists")
+    if printer_data.serial_number:
+        result = await db.execute(select(Printer).where(Printer.serial_number == printer_data.serial_number))
+        if result.scalar_one_or_none():
+            raise HTTPException(400, "Printer with this serial number already exists")
 
-    test_result = await printer_manager.test_connection(
-        ip_address=printer_data.ip_address,
-        serial_number=printer_data.serial_number,
-        access_code=printer_data.access_code,
+    test_result = (
+        await printer_manager.test_connection(
+            ip_address=printer_data.ip_address,
+            serial_number=printer_data.serial_number,
+            access_code=printer_data.access_code,
+        )
+        if printer_data.connection_type == "bambu"
+        else {"success": True}
     )
     if not test_result.get("success"):
         # The frontend renders the user-facing message via i18n on `code`;
@@ -193,6 +220,14 @@ async def create_printer(
         )
 
     printer = Printer(**printer_data.model_dump())
+    try:
+        printer.connection_secret = printer_data.connection_secret
+    except RuntimeError:
+        raise HTTPException(
+            503, "Secure credential storage is unavailable; check the encryption key configuration"
+        ) from None
+    if printer.connection_type != "bambu":
+        printer.is_active = False
     db.add(printer)
     await db.commit()
     await db.refresh(printer)
@@ -384,6 +419,40 @@ async def update_printer(
         raise HTTPException(404, "Printer not found")
 
     update_data = printer_data.model_dump(exclude_unset=True)
+    if "connection_type" in update_data and update_data["connection_type"] != printer.connection_type:
+        raise HTTPException(409, "Connection type is fixed after creation; add a separate printer configuration")
+    if printer.connection_type != "bambu" and update_data.get("is_active") is True:
+        raise HTTPException(409, "This connection type is configuration-only until its adapter is implemented")
+    connection_fields = {"connection_type", "api_url", "auth_mode", "duet_mode", "ip_address", "access_code"}
+    if connection_fields.intersection(update_data) or "connection_secret" in printer_data.model_fields_set:
+        if update_data.get("auth_mode") == "none":
+            secret = None
+        elif "connection_secret" in printer_data.model_fields_set:
+            secret = printer_data.connection_secret
+        else:
+            try:
+                secret = printer.connection_secret
+            except RuntimeError:
+                raise HTTPException(
+                    503, "Saved credential could not be decrypted; check the encryption key configuration"
+                ) from None
+        merged = {field: update_data.get(field, getattr(printer, field)) for field in connection_fields}
+        merged.update(name=printer.name, serial_number=printer.serial_number, connection_secret=secret)
+        try:
+            valid = PrinterCreate.model_validate(merged)
+        except ValidationError as exc:
+            # Do not include Pydantic's input/context: either may contain secrets.
+            raise HTTPException(
+                422, [{"loc": err["loc"], "msg": err["msg"], "type": err["type"]} for err in exc.errors()]
+            ) from None
+        for field in connection_fields.intersection(update_data):
+            update_data[field] = getattr(valid, field)
+        try:
+            printer.connection_secret = secret
+        except RuntimeError:
+            raise HTTPException(
+                503, "Secure credential storage is unavailable; check the encryption key configuration"
+            ) from None
 
     # Handle nested ROI object - flatten to individual columns
     if "plate_detection_roi" in update_data:

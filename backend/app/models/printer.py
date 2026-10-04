@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, String, func
+from sqlalchemy import Boolean, DateTime, Float, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.core.database import Base
+from backend.app.core.encryption import mfa_decrypt, mfa_encrypt
 
 
 class Printer(Base):
@@ -11,9 +12,34 @@ class Printer(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
-    serial_number: Mapped[str] = mapped_column(String(50), unique=True)
-    ip_address: Mapped[str] = mapped_column(String(253))
-    access_code: Mapped[str] = mapped_column(String(20))
+    serial_number: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(253), nullable=True)
+    access_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    connection_type: Mapped[str] = mapped_column(String(20), default="bambu", server_default="bambu")
+    api_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    auth_mode: Mapped[str] = mapped_column(String(20), default="none", server_default="none")
+    duet_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    _connection_secret_enc: Mapped[str | None] = mapped_column("connection_secret", Text, nullable=True)
+
+    @property
+    def connection_secret(self) -> str | None:
+        return mfa_decrypt(self._connection_secret_enc) if self._connection_secret_enc else None
+
+    @connection_secret.setter
+    def connection_secret(self, value: str | None) -> None:
+        encrypted = mfa_encrypt(value) if value else None
+        if encrypted is not None and not encrypted.startswith("fernet:"):
+            raise RuntimeError("Secure printer credential storage is unavailable")
+        self._connection_secret_enc = encrypted
+
+    @property
+    def has_connection_secret(self) -> bool:
+        return bool(self._connection_secret_enc)
+
+    @property
+    def connection_supported(self) -> bool:
+        return self.connection_type == "bambu"
+
     model: Mapped[str | None] = mapped_column(String(50))
     location: Mapped[str | None] = mapped_column(String(100))  # Group/location name
     nozzle_count: Mapped[int] = mapped_column(default=1)  # 1 or 2, auto-detected from MQTT
