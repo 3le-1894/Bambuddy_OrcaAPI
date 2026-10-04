@@ -39,7 +39,16 @@ class DesktopSyncTests(unittest.IsolatedAsyncioTestCase):
             }
         ]
         original_client = httpx.AsyncClient
-        transport = httpx.MockTransport(lambda req: httpx.Response(200, json={"profiles": self.profiles}))
+        transport = httpx.MockTransport(
+            lambda req: httpx.Response(
+                200,
+                json=(
+                    {"status": "healthy", "checks": {"orcaslicer": {"available": True, "version": "2.5.0-dev"}}}
+                    if req.url.path == "/health"
+                    else {"profiles": self.profiles}
+                ),
+            )
+        )
         self.client_patch = patch.object(
             sync.httpx, "AsyncClient", lambda **kwargs: original_client(transport=transport, **kwargs)
         )
@@ -101,3 +110,16 @@ class DesktopSyncTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(HTTPException):
             await sync.sync_desktop_profiles(self.db)
         self.assertEqual(len((await self.db.execute(select(LocalPreset))).scalars().all()), 0)
+
+    async def test_status_preserves_result_names_and_reports_connection(self):
+        await sync.sync_desktop_profiles(self.db)
+        status = await sync.sync_status(self.db)
+        self.assertEqual(status["profile_count"], 1)
+        self.assertEqual(status["sidecar"], {"status": "connected", "version": "2.5.0-dev"})
+        self.assertEqual(status["changes"], [{"name": "PLA", "preset_type": "filament", "action": "added"}])
+
+    async def test_status_when_sync_is_not_configured(self):
+        with patch.dict(os.environ, {"DESKTOP_PROFILE_SYNC_TOKEN": ""}):
+            status = await sync.sync_status(self.db)
+        self.assertEqual(status["sidecar"]["status"], "not_configured")
+        self.assertIsNone(status["synced_at"])

@@ -20,6 +20,7 @@ import { Card, CardContent } from './Card';
 import { Button } from './Button';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
+import { DesktopProfileSyncPanel } from './DesktopProfileSyncPanel';
 
 // Known material types for name-parsing fallback
 const MATERIAL_TYPES = ['PLA', 'PETG', 'PCTG', 'ABS', 'ASA', 'TPU', 'PC', 'PA', 'PVA', 'HIPS', 'PP', 'PET', 'NYLON'];
@@ -69,13 +70,13 @@ function PresetCard({
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
 
-  // Resolve material type: DB field → parse from name
+  // Resolve material type: DB field â†’ parse from name
   const material = preset.filament_type || parseMaterialFromName(preset.name);
 
-  // Resolve vendor: DB field → parse from name
+  // Resolve vendor: DB field â†’ parse from name
   const vendor = preset.filament_vendor || parseVendorFromName(preset.name);
 
-  // Parse colour for swatch — try explicit colour, then fall back to material type
+  // Parse colour for swatch â€” try explicit colour, then fall back to material type
   let colourHex: string | null = null;
   let hasExplicitColour = false;
   if (preset.default_filament_colour) {
@@ -104,7 +105,7 @@ function PresetCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              {/* 1) Color dot — always shown for filament presets, dimmed if no explicit colour */}
+              {/* 1) Color dot â€” always shown for filament presets, dimmed if no explicit colour */}
               {preset.preset_type === 'filament' && (
                 <div
                   className={`w-4 h-4 rounded-full border border-black/20 flex-shrink-0 ${
@@ -117,13 +118,13 @@ function PresetCard({
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {/* 2) Material tag — fallback to name parsing */}
+              {/* 2) Material tag â€” fallback to name parsing */}
               {material && (
                 <span className="text-xs px-1.5 py-0.5 rounded bg-bambu-green/20 text-bambu-green">
                   {material}
                 </span>
               )}
-              {/* 3) Vendor — fallback to name parsing */}
+              {/* 3) Vendor â€” fallback to name parsing */}
               {vendor && (
                 <span className="text-xs text-bambu-gray">{vendor}</span>
               )}
@@ -153,7 +154,7 @@ function PresetCard({
           </div>
         </div>
 
-        {/* 5) Expanded detail — show meaningful fields, hide self-inherits */}
+        {/* 5) Expanded detail â€” show meaningful fields, hide self-inherits */}
         {isExpanded && (
           <div className="mt-3 pt-3 border-t border-bambu-dark-tertiary text-xs space-y-1.5">
             {material && (
@@ -171,7 +172,7 @@ function PresetCard({
             {preset.nozzle_temp_min != null && preset.nozzle_temp_max != null && (
               <div className="flex justify-between">
                 <span className="text-bambu-gray">{t('profiles.localProfiles.nozzleTemp')}</span>
-                <span className="text-white">{preset.nozzle_temp_min}–{preset.nozzle_temp_max}°C</span>
+                <span className="text-white">{preset.nozzle_temp_min}â€“{preset.nozzle_temp_max}Â°C</span>
               </div>
             )}
             {preset.filament_cost && (
@@ -183,7 +184,7 @@ function PresetCard({
             {preset.filament_density && (
               <div className="flex justify-between">
                 <span className="text-bambu-gray">{t('profiles.localProfiles.density')}</span>
-                <span className="text-white">{preset.filament_density} g/cm³</span>
+                <span className="text-white">{preset.filament_density} g/cmÂ³</span>
               </div>
             )}
             {preset.pressure_advance && (
@@ -227,28 +228,6 @@ export function LocalProfilesView() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
-  const [syncSummary, setSyncSummary] = useState<string | null>(null);
-  const { data: syncStatus } = useQuery({
-    queryKey: ['desktopProfileSyncStatus'],
-    queryFn: () => api.getDesktopProfileSyncStatus(),
-  });
-  const syncMutation = useMutation({
-    mutationFn: () => api.syncDesktopProfiles(),
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['localPresets'] });
-      queryClient.invalidateQueries({ queryKey: ['slicerPresets'] });
-      queryClient.invalidateQueries({ queryKey: ['desktopProfileSyncStatus'] });
-      const summary = t('profiles.localProfiles.desktopSync.result', '{{updated}} updated, {{added}} added, {{unchanged}} unchanged.', result);
-      const notes = [
-        result.conflicts.length ? t('profiles.localProfiles.desktopSync.conflicts', 'Kept conflicting Bambuddy profiles: {{names}}.', { names: result.conflicts.join(', ') }) : '',
-        result.missing.length ? t('profiles.localProfiles.desktopSync.missing', 'Kept profiles no longer found on desktop: {{names}}.', { names: result.missing.join(', ') }) : '',
-      ].filter(Boolean).join(' ');
-      setSyncSummary(`${summary} ${notes}`.trim());
-      showToast(summary, result.conflicts.length ? 'warning' : 'success');
-    },
-    onError: (error: Error) => showToast(error.message, 'error'),
-  });
-
   const { data: presets, isLoading } = useQuery({
     queryKey: ['localPresets'],
     queryFn: () => api.getLocalPresets(),
@@ -348,7 +327,7 @@ export function LocalProfilesView() {
   const printers = useMemo(() => filterPresets(presets?.printer || []), [presets?.printer, filterPresets]);
   const processes = useMemo(() => filterPresets(presets?.process || []), [presets?.process, filterPresets]);
   const totalCount = filaments.length + printers.length + processes.length;
-  // Count of imported presets BEFORE the search filter — drives whether the
+  // Count of imported presets BEFORE the search filter â€” drives whether the
   // search bar shows at all. Gating the search bar on totalCount (post-filter)
   // made it vanish the moment a query matched nothing, leaving the user unable
   // to clear or edit their search without a page refresh (#1470).
@@ -368,23 +347,7 @@ export function LocalProfilesView() {
 
   return (
     <div className="space-y-6">
-      {hasPermission('settings:update') && (
-        <div className="rounded-lg border border-bambu-dark-tertiary p-4 space-y-2">
-          <Button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending || importMutation.isPending}>
-            {syncMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-            {syncMutation.isPending
-              ? t('profiles.localProfiles.desktopSync.running', 'Syncing desktop profiles…')
-              : t('profiles.localProfiles.desktopSync.button', 'Sync desktop Orca profiles')}
-          </Button>
-          <p className="text-sm text-bambu-gray">
-            {t('profiles.localProfiles.desktopSync.hint', 'Save your profiles in desktop Orca first. Sync updates the profiles on this Bambuddy host and its slicer sidecar.')}
-          </p>
-          {syncStatus?.synced_at && <p className="text-xs text-bambu-gray">
-            {t('profiles.localProfiles.desktopSync.last', 'Last sync: {{time}}', { time: new Date(syncStatus.synced_at).toLocaleString() })}
-          </p>}
-          {syncSummary && <p className="text-sm text-white" role="status">{syncSummary}</p>}
-        </div>
-      )}
+      {hasPermission('settings:update') && <DesktopProfileSyncPanel importPending={importMutation.isPending} />}
       {/* Import Zone */}
       {hasPermission('settings:update') && (
         <div

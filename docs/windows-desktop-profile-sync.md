@@ -6,6 +6,17 @@ saved profiles from the Windows Orca API companion, imports new profiles,
 updates managed profiles, and refreshes the slicing dropdowns. The page
 shows the last sync time and the added, updated, and unchanged counts.
 
+The **Desktop Orca profiles** panel checks the companion connection and shows
+its Orca version and the number of managed profiles still present in Bambuddy.
+**Sync now** is enabled once the companion is connected. Use the refresh icon
+to recheck a stopped or restarted companion. Connection status refreshes every
+30 seconds while the page is active.
+
+**View last changes** lists updated, added, and unchanged profile names from
+the last successful sync, plus conflicts and missing profiles. Results persist
+after reopening the page. **Review** expands the retained-profile details when
+conflicts or missing profiles need attention; it does not overwrite those edits.
+
 Profiles edited directly in Bambuddy after a sync are preserved and reported
 as conflicts. Removed or renamed desktop profiles are reported and kept.
 Unrelated profiles with the same name are preserved. The first sync can adopt

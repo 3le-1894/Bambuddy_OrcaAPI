@@ -2,6 +2,22 @@ import type { ArchivePlatesResponse, LibraryFilePlatesResponse } from '../types/
 
 const API_BASE = '/api/v1';
 
+export interface DesktopProfileSyncResult {
+  added: number;
+  updated: number;
+  unchanged: number;
+  conflicts: string[];
+  missing: string[];
+  changes?: { name: string; preset_type: string; action: 'added' | 'updated' | 'unchanged' }[];
+  synced_at: string;
+}
+
+export type DesktopProfileSyncStatus = Omit<Partial<DesktopProfileSyncResult>, 'synced_at'> & {
+  synced_at: string | null;
+  profile_count: number;
+  sidecar: { status: 'connected' | 'unreachable' | 'unhealthy' | 'not_configured'; version: string | null };
+};
+
 export class ApiError extends Error {
   status: number;
   /** Stable error code from a structured backend detail (`{code, message}`).
@@ -8122,9 +8138,9 @@ export const api = {
 
   // Local Presets (OrcaSlicer imports)
   getDesktopProfileSyncStatus: () =>
-    request<{ synced_at: string | null }>('/local-presets/desktop-sync/status'),
+    request<DesktopProfileSyncStatus>('/local-presets/desktop-sync/status'),
   syncDesktopProfiles: () =>
-    request<{ added: number; updated: number; unchanged: number; conflicts: string[]; missing: string[]; synced_at: string }>(
+    request<DesktopProfileSyncResult>(
       '/local-presets/desktop-sync', { method: 'POST' },
     ),
   getLocalPresets: () =>

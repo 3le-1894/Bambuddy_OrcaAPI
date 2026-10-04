@@ -41,7 +41,31 @@ async def setting_row(db: AsyncSession, key: str):
 async def sync_status(db: AsyncSession) -> dict:
     row = await setting_row(db, STATE_KEY)
     state = json.loads(row.value) if row else {}
-    return state.get("last_result", {"synced_at": None})
+    result = dict(state.get("last_result", {"synced_at": None}))
+    managed_ids = [v["id"] for v in state.get("managed", {}).values()]
+    result["profile_count"] = (
+        len((await db.execute(select(LocalPreset.id).where(LocalPreset.id.in_(managed_ids)))).scalars().all())
+        if managed_ids
+        else 0
+    )
+    result["sidecar"] = {"status": "not_configured", "version": None}
+    url_row = await setting_row(db, "orcaslicer_api_url")
+    if os.environ.get("DESKTOP_PROFILE_SYNC_TOKEN") and url_row and url_row.value:
+        try:
+            async with httpx.AsyncClient(timeout=4, follow_redirects=False) as client:
+                response = await client.get(url_row.value.rstrip("/") + "/health")
+                response.raise_for_status()
+                health = response.json()
+                orca = health.get("checks", {}).get("orcaslicer", {})
+                result["sidecar"] = {
+                    "status": "connected"
+                    if health.get("status") == "healthy" and orca.get("available")
+                    else "unhealthy",
+                    "version": orca.get("version"),
+                }
+        except (httpx.HTTPError, ValueError, TypeError, AttributeError):
+            result["sidecar"] = {"status": "unreachable", "version": None}
+    return result
 
 
 async def sync_desktop_profiles(db: AsyncSession) -> dict:
@@ -82,7 +106,15 @@ async def sync_desktop_profiles(db: AsyncSession) -> dict:
         by_id = {p.id: p for p in existing}
         by_name = {(p.preset_type, p.name): p for p in existing}
         now = datetime.now(timezone.utc).isoformat()
-        result = {"added": 0, "updated": 0, "unchanged": 0, "conflicts": [], "missing": [], "synced_at": now}
+        result = {
+            "added": 0,
+            "updated": 0,
+            "unchanged": 0,
+            "conflicts": [],
+            "missing": [],
+            "changes": [],
+            "synced_at": now,
+        }
         # Back up full settings before updating the transaction.
         backup = Path(settings.base_dir) / "backups" / "desktop-profiles"
         backup.mkdir(parents=True, exist_ok=True)
@@ -131,10 +163,14 @@ async def sync_desktop_profiles(db: AsyncSession) -> dict:
                 preset = LocalPreset(name=incoming.name, preset_type=incoming.preset_type, source="desktop_sync")
                 db.add(preset)
                 result["added"] += 1
+                action = "added"
             elif json.loads(preset.setting) == incoming.setting and preset.name == incoming.name:
                 result["unchanged"] += 1
+                action = "unchanged"
             else:
                 result["updated"] += 1
+                action = "updated"
+            result["changes"].append({"name": incoming.name, "preset_type": incoming.preset_type, "action": action})
             preset.name = incoming.name
             preset.source = "desktop_sync"
             preset.setting = json.dumps(incoming.setting)

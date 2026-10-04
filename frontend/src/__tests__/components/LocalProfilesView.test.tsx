@@ -82,7 +82,7 @@ const mockLocalPresets = {
 describe('LocalProfilesView', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/v1/local-presets/desktop-sync/status', () => HttpResponse.json({ synced_at: null })),
+      http.get('/api/v1/local-presets/desktop-sync/status', () => HttpResponse.json({ synced_at: null, profile_count: 0, sidecar: { status: 'connected', version: '2.5.0-dev' } })),
       http.get('/api/v1/local-presets/', () => {
         return HttpResponse.json(mockLocalPresets);
       }),
@@ -108,10 +108,13 @@ describe('LocalProfilesView', () => {
       added: 1, updated: 2, unchanged: 13, conflicts: ['Edited PLA'], missing: ['Old PETG'], synced_at: '2026-10-04T05:00:00Z',
     })));
     render(<LocalProfilesView />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Sync desktop Orca profiles' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('2 updated, 1 added, 13 unchanged.');
-    expect(screen.getByRole('status')).toHaveTextContent('Edited PLA');
-    expect(screen.getByRole('status')).toHaveTextContent('Old PETG');
+    const syncButton = await screen.findByRole('button', { name: 'Sync now' });
+    await waitFor(() => expect(syncButton).toBeEnabled());
+    fireEvent.click(syncButton);
+    expect(await screen.findByRole('status')).toHaveAttribute('aria-label', '2 updated, 1 added, 13 unchanged.');
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    expect(screen.getByText('Edited PLA')).toBeInTheDocument();
+    expect(screen.getByText('Old PETG')).toBeInTheDocument();
   });
 
   it('shows material badges from filament_type', async () => {
@@ -124,6 +127,36 @@ describe('LocalProfilesView', () => {
     // PLA badge should appear for the first preset
     const plaBadges = screen.getAllByText('PLA');
     expect(plaBadges.length).toBeGreaterThan(0);
+  });
+
+  it('loads saved sync results and profile names after reopening the page', async () => {
+    server.use(http.get('/api/v1/local-presets/desktop-sync/status', () => HttpResponse.json({
+      synced_at: '2026-10-04T05:00:00Z', profile_count: 16,
+      sidecar: { status: 'connected', version: '2.5.0-dev' },
+      updated: 1, added: 0, unchanged: 15, conflicts: [], missing: [],
+      changes: [{ name: 'Saved desktop PLA', preset_type: 'filament', action: 'updated' }],
+    })));
+    render(<LocalProfilesView />);
+    expect(await screen.findByText('Sidecar connected')).toBeInTheDocument();
+    expect(screen.getByText('Orca 2.5.0-dev')).toBeInTheDocument();
+    expect(screen.getByText(/16 synced profiles/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View last changes' }));
+    expect(screen.getByText('Saved desktop PLA')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View last changes' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('disables sync while offline and lets the user refresh the connection', async () => {
+    server.use(http.get('/api/v1/local-presets/desktop-sync/status', () => HttpResponse.json({
+      synced_at: null, profile_count: 0, sidecar: { status: 'unreachable', version: null },
+    })));
+    render(<LocalProfilesView />);
+    expect(await screen.findByText('Sidecar unavailable')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sync now' })).toBeDisabled();
+    server.use(http.get('/api/v1/local-presets/desktop-sync/status', () => HttpResponse.json({
+      synced_at: null, profile_count: 0, sidecar: { status: 'connected', version: '2.5.0-dev' },
+    })));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh sidecar connection' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sync now' })).toBeEnabled());
   });
 
   it('shows vendor from filament_vendor field', async () => {
