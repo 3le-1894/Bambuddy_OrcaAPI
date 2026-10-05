@@ -19,12 +19,14 @@ export function PrinterConnectionFields({ value, onChange, editing = false, hasS
         onChange={event => onChange({ connection_type: event.target.value as ConnectionSettings['connection_type'],
           api_url: '', auth_mode: 'none', duet_mode: null, connection_secret: '' })}>
         <option value="bambu">Bambu Lab</option>
-        <option value="klipper">Klipper / Moonraker — configuration only</option>
+        <option value="klipper">Klipper / Moonraker — monitoring</option>
         <option value="duet">Duet / RepRapFirmware — configuration only</option>
       </select>
     </div>
     {type !== 'bambu' && <>
-      <p className="text-sm text-amber-400" role="status">Configuration only. Monitoring and print controls will become available when this adapter is added.</p>
+      <p className="text-sm text-amber-400" role="status">{type === 'klipper'
+        ? 'Live monitoring through Moonraker. Print controls are not yet available.'
+        : 'Configuration only. Monitoring and print controls will become available when this adapter is added.'}</p>
       <div>
         <label htmlFor="printer_api_url" className="block text-sm text-bambu-gray mb-1">Server URL</label>
         <input id="printer_api_url" type="url" required className={inputClass} value={value.api_url || ''}

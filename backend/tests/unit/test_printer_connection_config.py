@@ -106,7 +106,7 @@ def test_non_bambu_response_has_no_secret_or_internal_credentials():
     response = PrinterResponse.from_orm_with_roi(row).model_dump()
     assert response["serial_number"] == ""
     assert response["has_connection_secret"]
-    assert not response["connection_supported"]
+    assert response["connection_supported"]
     assert "connection_secret" not in response and "access_code" not in response
     assert "test-private-value" not in str(response)
 

@@ -3,6 +3,7 @@ import logging
 import re
 import secrets
 import zipfile
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -62,6 +63,12 @@ from backend.app.services.bambu_ftp import (
     list_files_result_async,
 )
 from backend.app.services.print_storage import ftp_probe_paths, print_file_reachable_over_ftp
+from backend.app.services.printer_adapter import (
+    FleetPrinterStatus,
+    PrinterActivity,
+    PrinterCapabilities,
+    PrinterReadiness,
+)
 from backend.app.services.printer_diagnostic import run_connection_diagnostic
 from backend.app.services.printer_manager import (
     display_temperatures,
@@ -118,7 +125,7 @@ async def require_available_printer_transport(request: Request, db: AsyncSession
         await db.execute(select(Printer.connection_type).where(Printer.id == printer_id))
     ).scalar_one_or_none()
     if connection_type in ("klipper", "duet"):
-        raise HTTPException(409, "This connection type is configuration-only until its adapter is implemented")
+        raise HTTPException(409, "This operation is unavailable for this connection type")
 
 
 router = APIRouter(prefix="/printers", tags=["printers"], dependencies=[Depends(require_available_printer_transport)])
@@ -226,7 +233,7 @@ async def create_printer(
         raise HTTPException(
             503, "Secure credential storage is unavailable; check the encryption key configuration"
         ) from None
-    if printer.connection_type != "bambu":
+    if printer.connection_type == "duet":
         printer.is_active = False
     db.add(printer)
     await db.commit()
@@ -385,6 +392,30 @@ async def get_developer_mode_warnings(
     return warnings
 
 
+@router.get("/fleet-status")
+async def get_fleet_statuses(
+    _=RequirePermissionIfAuthEnabled(Permission.PRINTERS_READ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Read cached common telemetry; never contact printers from this request."""
+    printers = (await db.execute(select(Printer))).scalars().all()
+    result = {}
+    for printer in printers:
+        adapter = printer_manager.get_adapter(printer.id)
+        status = printer_manager.get_fleet_status(printer.id) or FleetPrinterStatus(
+            connected=False,
+            activity=PrinterActivity.OFFLINE,
+            readiness=PrinterReadiness.OFFLINE,
+            native_state="unknown",
+        )
+        result[printer.id] = {
+            **asdict(status),
+            "family": printer.connection_type,
+            "capabilities": asdict(adapter.capabilities if adapter else PrinterCapabilities()),
+        }
+    return result
+
+
 @router.get("/{printer_id}")
 async def get_printer(
     printer_id: int,
@@ -421,7 +452,7 @@ async def update_printer(
     update_data = printer_data.model_dump(exclude_unset=True)
     if "connection_type" in update_data and update_data["connection_type"] != printer.connection_type:
         raise HTTPException(409, "Connection type is fixed after creation; add a separate printer configuration")
-    if printer.connection_type != "bambu" and update_data.get("is_active") is True:
+    if printer.connection_type == "duet" and update_data.get("is_active") is True:
         raise HTTPException(409, "This connection type is configuration-only until its adapter is implemented")
     connection_fields = {"connection_type", "api_url", "auth_mode", "duet_mode", "ip_address", "access_code"}
     if connection_fields.intersection(update_data) or "connection_secret" in printer_data.model_fields_set:
@@ -476,7 +507,15 @@ async def update_printer(
     await db.refresh(printer)
 
     # Reconnect if connection settings changed
-    if any(k in update_data for k in ["ip_address", "access_code", "is_active"]):
+    if printer.connection_type == "klipper" and (
+        {"api_url", "auth_mode", "is_active"}.intersection(update_data)
+        or "connection_secret" in printer_data.model_fields_set
+    ):
+        if printer.is_active:
+            await printer_manager.connect_printer(printer)
+        else:
+            await printer_manager.unregister_fleet_adapter(printer_id)
+    elif any(k in update_data for k in ["ip_address", "access_code", "is_active"]):
         printer_manager.disconnect_printer(printer_id)
         if printer.is_active:
             await printer_manager.connect_printer(printer)
@@ -511,6 +550,7 @@ async def delete_printer(
         raise HTTPException(404, "Printer not found")
 
     printer_manager.disconnect_printer(printer_id)
+    await printer_manager.unregister_fleet_adapter(printer_id)
 
     if delete_archives:
         # Delete all archives for this printer

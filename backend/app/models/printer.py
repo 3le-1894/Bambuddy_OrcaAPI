@@ -38,7 +38,7 @@ class Printer(Base):
 
     @property
     def connection_supported(self) -> bool:
-        return self.connection_type == "bambu"
+        return self.connection_type in ("bambu", "klipper")
 
     model: Mapped[str | None] = mapped_column(String(50))
     location: Mapped[str | None] = mapped_column(String(100))  # Group/location name

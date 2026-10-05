@@ -2,6 +2,29 @@ import type { ArchivePlatesResponse, LibraryFilePlatesResponse } from '../types/
 
 const API_BASE = '/api/v1';
 
+export interface FleetPrinterStatus {
+  family: 'bambu' | 'klipper' | 'duet';
+  connected: boolean;
+  activity: 'unknown' | 'offline' | 'idle' | 'preparing' | 'printing' | 'paused' | 'completed' | 'error';
+  readiness: 'unknown' | 'offline' | 'ready' | 'busy' | 'blocked' | 'awaiting_clearance';
+  native_state: string;
+  filename: string | null;
+  progress_percent: number | null;
+  remaining_seconds: number | null;
+  last_seen_at: number | null;
+  tools: FleetTemperature[];
+  bed: FleetTemperature | null;
+  chamber: FleetTemperature | null;
+  error_codes: string[];
+  capabilities: { pause: boolean; resume: boolean; cancel: boolean };
+}
+
+export interface FleetTemperature {
+  identifier: string;
+  current: number | null;
+  target: number | null;
+}
+
 export interface DesktopProfileSyncResult {
   added: number;
   updated: number;
@@ -4906,6 +4929,7 @@ export const api = {
   },
   getPrinterStatus: (id: number) =>
     request<PrinterStatus>(`/printers/${id}/status`),
+  getFleetStatuses: () => request<Record<number, FleetPrinterStatus>>('/printers/fleet-status'),
   refreshPrinterStatus: (id: number) =>
     request<{ status: string }>(`/printers/${id}/refresh-status`, {
       method: 'POST',

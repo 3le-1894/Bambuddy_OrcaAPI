@@ -1,7 +1,8 @@
 # Farm printer adapter foundation
 
 This is the first backend step toward a mixed Bambu, Klipper, and Duet/RRF
-fleet. It does not add non-Bambu connections or change the dashboard yet.
+fleet. Moonraker monitoring now uses this foundation; Duet monitoring and
+non-Bambu print dispatch remain future work.
 
 ## Contract
 
@@ -45,7 +46,7 @@ Capabilities describe operations implemented by the common interface. Upload,
 start, lifecycle, and event subscription contracts will be added with the first
 new transport. Existing Bambu upload/start routes remain in place.
 
-## Next steps
+## Background refresh and lifecycle
 
 ### Background refresh and cached reads
 
@@ -62,8 +63,8 @@ refresh resets backoff. Reads never schedule a poll or reconnect.
 
 Subclasses must use async HTTP with explicit network timeouts and propagate
 cancellation. Object discovery should be cached by the transport and repeated
-on connection/configuration changes. The base does not yet implement Moonraker
-HTTP or WebSocket subscriptions. A subclass that owns an HTTP client must close
+on connection/configuration changes. The base is transport-independent; the
+Moonraker subclass adds HTTP polling. A subclass that owns an HTTP client must close
 it in `stop()` after awaiting the base task cancellation.
 
 New lifecycle entry points are `register_fleet_adapter`,
@@ -74,13 +75,9 @@ client registry; lifecycle changes must use these async methods, not the legacy
 `disconnect_printer`/`disconnect_all` methods. Application shutdown now awaits
 managed adapters before disconnecting Bambu clients.
 
-This is infrastructure for the first Moonraker adapter. It does not add a new
-printer connection choice or change the existing dashboard yet.
-
-Add connection configuration and database migrations, a Moonraker adapter,
-then Duet standalone/SBC adapters. Add fleet API schemas and WebSocket events
-before switching dashboard consumers. Retain legacy Bambu state for AMS and
-other vendor-specific features; do not force other adapters to fabricate it.
+Duet standalone/SBC adapters, Moonraker controls and WebSocket subscriptions
+remain future work. Retain legacy Bambu state for AMS and other vendor-specific
+features; do not force other adapters to fabricate it.
 
 ## Connection configuration patch
 
@@ -103,11 +100,10 @@ New secrets use the application's encryption key and refuse plaintext fallback
 if secure storage is unavailable. Preserve the existing encryption key with
 database backups, just as for other encrypted application settings.
 
-Klipper and Duet entries stay inactive and appear as configuration-only cards
-with edit/remove actions. Legacy control, file and connection endpoints return
-409 for them. They are not eligible for active-printer startup or scheduling.
-The transport implementation is a separate patch; saved settings do not imply
-that a printer was contacted or verified.
+Duet entries stay inactive and appear as configuration-only cards. Klipper
+entries now support monitoring as described below. Legacy control, file and
+connection endpoints return 409 for both; use configuration edits to enable or
+disable Moonraker monitoring. No non-Bambu print dispatch is implemented.
 
 The migration adds columns and relaxes Bambu-only NOT NULL requirements.
 PostgreSQL uses ALTER COLUMN; SQLite follows the existing project's schema
@@ -127,3 +123,49 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Bambuddy\Update-Bambuddy
 Focused tests are in `backend/tests/unit/test_printer_adapter.py` and can be run
 with the existing backend test environment. No build or deployment is required
 for this source change.
+
+## Moonraker monitoring patch
+
+`MoonrakerPrinterAdapter` uses one async HTTP client per active Klipper entry,
+with the saved API key in `X-Api-Key` when configured. It preserves proxy URL
+prefixes, does not follow redirects or use environment proxies, and never sends
+print commands. The background poll checks `/server/info`, discovers available
+objects once, then queries their status every five seconds. Object discovery
+is repeated after failures or Klipper restarts. Timeouts and retry/backoff come
+from the polling base. Stopping/replacing/removing the adapter awaits its task
+and closes its HTTP client. Credential failures keep the printer offline.
+
+State mapping is conservative: standby is idle/ready, printing and paused are
+busy, complete awaits physical plate clearance, cancelled is idle/blocked,
+and errors/shutdown are blocked. A responding Moonraker with disconnected
+Klipper is distinct from an unreachable Moonraker. Missing or unexpected data
+never implies readiness. Available extruders are named with their Klipper
+identifiers; unavailable measurements remain null, and zero remains valid.
+Only `temperature_sensor chamber` or `heater_generic chamber` is shown as a
+chamber sensor. Pi/MCU sensors are never substituted.
+
+Remaining time is explicitly an estimate from print duration and file progress,
+not slicer metadata. It is absent with no usable progress/duration or while
+paused. New Klipper entries enable monitoring automatically without requiring
+connectivity during save. Older configuration-only Klipper entries retain their
+inactive setting: edit them and uncheck **Disable monitoring** to enable it.
+
+`GET /api/v1/printers/fleet-status` requires printers:read and returns cached
+common status plus family and capabilities for configured printers. It does no
+printer network I/O and returns no connection secrets. The dashboard shares one
+five-second request across all Klipper cards. Status summary, filters, grouping
+and ETA sorting use a display-only projection of these snapshots; legacy Bambu
+caches and command routes remain separate. Failed backend requests or offline
+snapshots hide stale temperature/progress readings on the Klipper card.
+
+Monitoring is tested with httpx MockTransport, not a physical printer. Tests
+cover state/unit mapping, multi-extruder readings, malformed responses, auth
+headers, proxy paths, cache-only reads, discovery reuse, timeout cancellation,
+HTTP resource cleanup, settings lifecycle and dashboard rendering. Live testing
+requires a Pi with Klipper and Moonraker reachable from the Bambuddy container.
+Print upload/start, pause/resume/cancel, cameras, print archiving, Moonraker
+WebSockets and Duet monitoring are not part of this patch.
+
+API references: [Moonraker printer administration](https://moonraker.readthedocs.io/en/latest/external_api/printer/),
+[printer objects](https://moonraker.readthedocs.io/en/latest/printer_objects/),
+and [HTTP API authentication](https://moonraker.readthedocs.io/en/latest/external_api/introduction/).

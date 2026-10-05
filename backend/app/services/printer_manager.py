@@ -17,6 +17,7 @@ from backend.app.services.bambu_mqtt import (
     PrinterState,
     get_stage_name,
 )
+from backend.app.services.moonraker_adapter import MoonrakerPrinterAdapter
 from backend.app.services.printer_adapter import (
     FleetPrinterStatus,
     ManagedPrinterAdapter,
@@ -751,8 +752,23 @@ class PrinterManager:
 
     async def connect_printer(self, printer: Printer) -> bool:
         """Connect to a printer."""
-        if getattr(printer, "connection_type", "bambu") in ("klipper", "duet"):
-            return False  # Configuration-only until the corresponding transport is implemented.
+        if getattr(printer, "connection_type", "bambu") == "duet":
+            return False  # Duet remains configuration-only.
+        if getattr(printer, "connection_type", "bambu") == "klipper":
+            if not printer.is_active or not printer.api_url:
+                await self.unregister_fleet_adapter(printer.id)
+                return False
+            try:
+                api_key = printer.connection_secret if printer.auth_mode == "api_key" else None
+                if printer.auth_mode == "api_key" and not api_key:
+                    raise RuntimeError("Missing Moonraker credential")
+            except Exception:
+                await self.unregister_fleet_adapter(printer.id)
+                logger.warning("Cannot load Moonraker credential for printer %s", printer.id)
+                return False
+            adapter = MoonrakerPrinterAdapter(printer.api_url, api_key=api_key)
+            await self.register_fleet_adapter(printer.id, adapter)
+            return True
         if printer.id in self._fleet_adapters:
             await self.unregister_fleet_adapter(printer.id)
         if printer.id in self._clients:

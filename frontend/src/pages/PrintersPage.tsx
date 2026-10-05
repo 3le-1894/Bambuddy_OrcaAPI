@@ -1,5 +1,8 @@
 import { PrinterConnectionFields } from '../components/PrinterConnectionFields';
 import { connectionPayload } from '../utils/printerConnection';
+import { FleetTelemetry } from '../components/FleetTelemetry';
+import { useFleetStatuses } from '../hooks/useFleetStatuses';
+import { fleetDashboardStatus } from '../utils/fleetDashboardStatus';
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { compareFwVersions } from '../utils/firmwareVersion';
@@ -1224,7 +1227,7 @@ function StatusSummaryBar({ printers }: { printers: Printer[] | undefined }) {
     let nextProgress: number = 0;
 
     printers?.forEach((printer) => {
-      const status = queryClient.getQueryData<{ connected: boolean; state: string | null; remaining_time: number | null; progress: number | null; hms_errors?: HMSError[] }>(['printerStatus', printer.id]);
+      const status = fleetDashboardStatus(queryClient, printer);
       if (status === undefined) {
         // Status not yet loaded - don't count as offline yet
         loading++;
@@ -1233,7 +1236,7 @@ function StatusSummaryBar({ printers }: { printers: Printer[] | undefined }) {
       } else {
         // Count printers with active HMS errors as problems
         const knownHmsCount =
-          status.hms_errors ? filterKnownHMSErrors(status.hms_errors).length : 0;
+          status.fleet_error ? 1 : status.hms_errors ? filterKnownHMSErrors(status.hms_errors).length : 0;
         if (knownHmsCount > 0) {
           error++;
         }
@@ -1650,11 +1653,11 @@ const STATUS_GROUP_META: Record<string, { labelKey: string; dot: string }> = {
 
 /** Classify a printer into one of the UI status buckets. */
 function classifyPrinterStatus(
-  status: { connected: boolean; state: string | null; hms_errors?: HMSError[] } | undefined,
+  status: { connected: boolean; state: string | null; hms_errors?: HMSError[]; fleet_error?: boolean } | undefined,
 ): PrinterState {
   if (!status?.connected) return 'offline';
   const hmsErrors = status.hms_errors ? filterKnownHMSErrors(status.hms_errors) : [];
-  if (hmsErrors.length > 0) return 'error';
+  if (hmsErrors.length > 0 || status.fleet_error) return 'error';
   switch (status.state) {
     case 'RUNNING': return 'printing';
     case 'PAUSE':   return 'paused';
@@ -2035,28 +2038,33 @@ function ScheduledDryingBanner({ printerId, dryingActive, timeFormat }: { printe
 
 function PrinterCard(props: React.ComponentProps<typeof BambuPrinterCard>) {
   if (props.printer.connection_type && props.printer.connection_type !== 'bambu') {
-    return <ConfiguredPrinterCard printer={props.printer} />;
+    return <ConfiguredPrinterCard printer={props.printer} hideIfDisconnected={props.hideIfDisconnected} />;
   }
   return <BambuPrinterCard {...props} />;
 }
 
-function ConfiguredPrinterCard({ printer }: { printer: Printer }) {
+function ConfiguredPrinterCard({ printer, hideIfDisconnected }: { printer: Printer; hideIfDisconnected?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
+  const fleet = useFleetStatuses(printer.connection_type === 'klipper');
+  const status = fleet.data?.[printer.id];
   const deletion = useMutation({
     mutationFn: () => api.deletePrinter(printer.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['printers'] }),
     onError: (error: Error) => showToast(error.message, 'error'),
   });
+  if (hideIfDisconnected && (!printer.is_active || fleet.isError || !status?.connected || status.activity === 'offline')) return null;
   return <>
     <Card><CardContent>
       <h3 className="font-semibold">{printer.name}</h3>
       <p className="text-sm text-bambu-gray">{printer.connection_type === 'klipper' ? 'Klipper / Moonraker' : 'Duet / RRF'}</p>
       <p className="text-sm break-all mt-2">{printer.api_url}</p>
-      <p className="text-sm text-amber-400 mt-2">Configuration only — adapter not yet available</p>
+      {printer.connection_type === 'klipper'
+        ? <FleetTelemetry status={status} active={printer.is_active} failed={fleet.isError} />
+        : <p className="text-sm text-amber-400 mt-2">Configuration only — adapter not yet available</p>}
       {printer.location && <p className="text-sm text-bambu-gray">{printer.location}</p>}
       <div className="flex gap-2 mt-4">
         {hasPermission('printers:update') && <Button onClick={() => setEditing(true)}>Edit configuration</Button>}
@@ -8710,18 +8718,18 @@ function EditPrinterModal({
                 <input
                   type="checkbox"
                   id="edit_maintenance_mode"
-                  disabled={form.connection_type !== 'bambu'}
+                  disabled={form.connection_type === 'duet'}
                   checked={!form.is_active}
                   onChange={(e) => setForm({ ...form, is_active: !e.target.checked })}
                   className="rounded border-bambu-dark-tertiary bg-bambu-dark text-amber-400 focus:ring-amber-400"
                 />
                 <label htmlFor="edit_maintenance_mode" className="text-sm text-bambu-gray flex items-center gap-1.5">
                   <Wrench className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  {t('printers.maintenance.editFieldLabel')}
+                  {form.connection_type === 'klipper' ? 'Disable monitoring' : t('printers.maintenance.editFieldLabel')}
                 </label>
               </div>
               <p className="text-xs text-bambu-gray/70 mt-1 ml-6">
-                {t('printers.maintenance.editFieldHelp')}
+                {form.connection_type === 'klipper' ? 'Leave unchecked to connect to Moonraker and refresh live status.' : t('printers.maintenance.editFieldHelp')}
               </p>
             </div>
             {saveWarning ? (
@@ -8984,6 +8992,7 @@ export function PrintersPage() {
     queryKey: ['printers'],
     queryFn: api.getPrinters,
   });
+  useFleetStatuses(printers?.some(printer => printer.connection_type === 'klipper') ?? false, true);
 
   // Fetch the UI-rendering subset of settings. Uses /ui-preferences (not /settings)
   // so users with printers:read but no settings:read still get the values needed
@@ -9356,7 +9365,7 @@ export function PrintersPage() {
       if (
         event.type === 'updated' &&
         Array.isArray(event.query.queryKey) &&
-        event.query.queryKey[0] === 'printerStatus'
+        ['printerStatus', 'fleetStatuses'].includes(String(event.query.queryKey[0]))
       ) {
         setStatusCacheVersion(v => v + 1);
       }
@@ -9388,7 +9397,7 @@ export function PrintersPage() {
     // Status filter
     if (statusFilter !== 'all') {
       result = result.filter(p => {
-        const status = queryClient.getQueryData<{ connected: boolean; state: string | null; hms_errors?: HMSError[] }>(['printerStatus', p.id]);
+        const status = fleetDashboardStatus(queryClient, p);
         if (!status?.connected) return statusFilter === 'offline';
         const hmsErrors = status.hms_errors ? filterKnownHMSErrors(status.hms_errors) : [];
         switch (statusFilter) {
@@ -9450,13 +9459,13 @@ export function PrintersPage() {
       case 'status':
         // Sort by status: HMS errors > printing > idle > offline
         sorted.sort((a, b) => {
-          const statusA = queryClient.getQueryData<{ connected: boolean; state: string | null; hms_errors?: HMSError[] }>(['printerStatus', a.id]);
-          const statusB = queryClient.getQueryData<{ connected: boolean; state: string | null; hms_errors?: HMSError[] }>(['printerStatus', b.id]);
+          const statusA = fleetDashboardStatus(queryClient, a);
+          const statusB = fleetDashboardStatus(queryClient, b);
 
           const getPriority = (s: typeof statusA) => {
             if (!s?.connected) return 3; // offline
             const hmsErrors = s.hms_errors ? filterKnownHMSErrors(s.hms_errors) : [];
-            if (hmsErrors.length > 0) return 0; // HMS errors - top priority
+            if (hmsErrors.length > 0 || s.fleet_error) return 0; // Errors - top priority
             if (s.state === 'RUNNING') return 1; // printing
             return 2; // idle
           };
@@ -9466,8 +9475,8 @@ export function PrintersPage() {
         break;
       case 'eta':
         sorted.sort((a, b) => {
-          const statusA = queryClient.getQueryData<{ connected: boolean; state: string | null; remaining_time: number | null }>(['printerStatus', a.id]);
-          const statusB = queryClient.getQueryData<{ connected: boolean; state: string | null; remaining_time: number | null }>(['printerStatus', b.id]);
+          const statusA = fleetDashboardStatus(queryClient, a);
+          const statusB = fleetDashboardStatus(queryClient, b);
 
           const tier = (s: typeof statusA) => {
             if (!s?.connected) return 3; // offline last
@@ -9494,7 +9503,8 @@ export function PrintersPage() {
     }
 
     return sorted;
-  }, [filteredPrinters, sortBy, sortAsc, queryClient]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- statusCacheVersion refreshes sorting when cached telemetry changes
+  }, [filteredPrinters, sortBy, sortAsc, queryClient, statusCacheVersion]);
 
   const selectAll = useCallback(() => {
     setSelectedPrinterIds(new Set(sortedPrinters.map(p => p.id)));
@@ -9505,7 +9515,7 @@ export function PrintersPage() {
     setSelectedPrinterIds(prev => {
       const next = new Set(prev);
       sortedPrinters.forEach(p => {
-        const status = queryClient.getQueryData<{ connected: boolean; state: string | null; hms_errors?: HMSError[] }>(['printerStatus', p.id]);
+        const status = fleetDashboardStatus(queryClient, p);
         if (classifyPrinterStatus(status) === state) next.add(p.id);
       });
       return next;
@@ -9559,7 +9569,7 @@ export function PrintersPage() {
       });
     } else if (sortBy === 'status') {
       sortedPrinters.forEach(printer => {
-        const status = queryClient.getQueryData<{ connected: boolean; state: string | null; hms_errors?: HMSError[] }>(['printerStatus', printer.id]);
+        const status = fleetDashboardStatus(queryClient, printer);
         const group = classifyPrinterStatus(status);
         if (!groups[group]) groups[group] = [];
         groups[group].push(printer);
