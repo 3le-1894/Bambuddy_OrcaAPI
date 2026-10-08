@@ -1,4 +1,9 @@
-param([switch]$BuildOnly, [string]$StackRoot = 'C:\Bambuddy')
+param(
+    [switch]$BuildOnly,
+    [string]$StackRoot = 'C:\Bambuddy',
+    [string]$DesktopProfilesPath,
+    [string[]]$DesktopProfilesPaths
+)
 
 $ErrorActionPreference = 'Stop'
 $stack = $StackRoot
@@ -10,6 +15,43 @@ $image = "bambuddy-orcaapi:$stamp"
 $backup = Join-Path $stack "Backups\fork-deployment-$stamp"
 $node = Join-Path $api 'runtime\node.exe'
 if (-not (Test-Path -LiteralPath $node)) { throw 'The sidecar runtime is missing.' }
+
+# Preserve selected instances across deployments; never reset to stale Roaming copies.
+if ($DesktopProfilesPath -and $DesktopProfilesPaths) { throw 'Choose one source option.' }
+$sourceEnv = @(Get-Content (Join-Path $api '.env'))
+if ($DesktopProfilesPath) { $DesktopProfilesPaths = @($DesktopProfilesPath) }
+if (-not $DesktopProfilesPaths) {
+    $multipleSources = @($sourceEnv | Where-Object { $_ -match '^DESKTOP_PROFILES_PATHS=' })
+    $singleSource = @($sourceEnv | Where-Object { $_ -match '^DESKTOP_PROFILES_PATH=' })
+    if ($multipleSources.Count) {
+        # Windows PowerShell 5.1 emits the JSON array as one pipeline object.
+        # Unwrap it before assigning to string[] so paths are not joined with spaces.
+        $decodedSources = ConvertFrom-Json -InputObject $multipleSources[0].Substring('DESKTOP_PROFILES_PATHS='.Length)
+        if ($decodedSources -isnot [array] -or $decodedSources.Count -eq 0) {
+            throw 'DESKTOP_PROFILES_PATHS must be a non-empty JSON array of paths.'
+        }
+        $DesktopProfilesPaths = @(foreach ($decodedSource in $decodedSources) {
+            if ($decodedSource -isnot [string] -or [string]::IsNullOrWhiteSpace($decodedSource)) {
+                throw 'DESKTOP_PROFILES_PATHS must contain only non-empty strings.'
+            }
+            $decodedSource
+        })
+    } elseif ($singleSource.Count) {
+        $DesktopProfilesPaths = @($singleSource[0].Substring('DESKTOP_PROFILES_PATH='.Length).Trim().Trim('"').Trim("'"))
+    } else {
+        $DesktopProfilesPaths = @(Join-Path $env:APPDATA 'OrcaSlicer\user\5e5d6945-094f-439c-bad1-a5399dcb4267')
+    }
+}
+$DesktopProfilesPaths = @($DesktopProfilesPaths | ForEach-Object {
+    $sourcePath = (Resolve-Path -LiteralPath $_ -ErrorAction Stop).Path
+    foreach ($category in @('machine', 'process', 'filament')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $sourcePath $category) -PathType Container)) {
+            throw "Desktop profile source must contain machine, process and filament: $sourcePath"
+        }
+    }
+    $sourcePath.Replace('\', '/')
+})
+if (-not $DesktopProfilesPaths.Count) { throw 'At least one desktop profile account folder is required.' }
 
 function Invoke-Docker {
     & docker.exe @args
@@ -78,8 +120,8 @@ try {
         $token = [Convert]::ToBase64String($bytes)
     }
     "DESKTOP_PROFILE_SYNC_TOKEN=$token" | Set-Content $syncEnv -Encoding ascii
-    $envLines = @(Get-Content (Join-Path $api '.env') | Where-Object { $_ -notmatch '^DESKTOP_(PROFILE_SYNC_TOKEN|PROFILES_PATH)=' })
-    $envLines += 'DESKTOP_PROFILES_PATH=C:/Users/3leme/AppData/Roaming/OrcaSlicer/user/5e5d6945-094f-439c-bad1-a5399dcb4267'
+    $envLines = @(Get-Content (Join-Path $api '.env') | Where-Object { $_ -notmatch '^DESKTOP_(PROFILE_SYNC_TOKEN|PROFILES_PATHS?)=' })
+    $envLines += ('DESKTOP_PROFILES_PATHS=' + (ConvertTo-Json -InputObject @($DesktopProfilesPaths) -Compress))
     $envLines += "DESKTOP_PROFILE_SYNC_TOKEN=$token"
     $envLines | Set-Content (Join-Path $api '.env') -Encoding utf8
     $configuration = Get-Content $compose -Raw

@@ -479,10 +479,10 @@ index 18fbfdc..499b269 100644
        checks.orcaslicer.version = version;
 diff --git a/src/routes/profiles/desktop-sync.ts b/src/routes/profiles/desktop-sync.ts
 new file mode 100644
-index 0000000..3c1430c
+index 0000000..3202024
 --- /dev/null
 +++ b/src/routes/profiles/desktop-sync.ts
-@@ -0,0 +1,59 @@
+@@ -0,0 +1,82 @@
 +import fs from "node:fs/promises";
 +import path from "node:path";
 +import { timingSafeEqual } from "node:crypto";
@@ -497,15 +497,22 @@ index 0000000..3c1430c
 +}
 +
 +export async function desktopProfiles() {
-+  const source = process.env.DESKTOP_PROFILES_PATH;
++  const configured: unknown = process.env.DESKTOP_PROFILES_PATHS
++    ? JSON.parse(process.env.DESKTOP_PROFILES_PATHS)
++    : [process.env.DESKTOP_PROFILES_PATH];
++  if (!Array.isArray(configured) || !configured.length || configured.some(p => typeof p !== "string" || !p)) {
++    throw new AppError(503, "Configure a non-empty list of desktop profile account folders.");
++  }
++  const sources = configured as string[];
 +  const bundledProfilesPath = getDefaultBundledProfilesPath();
-+  if (!source || !bundledProfilesPath) throw new AppError(503, "Desktop profile sync is not configured.");
-+  const root = await fs.realpath(source);
++  if (!bundledProfilesPath) throw new AppError(503, "Desktop profile sync is not configured.");
++  const sourceRoots = [...new Set(await Promise.all(sources.map(source => fs.realpath(source))))];
 +  const data = process.env.DATA_PATH ?? "data";
 +  let legacy: Array<{ id: number; source: string; name: string; type: string }> = [];
 +  try { legacy = JSON.parse(await fs.readFile(path.join(data, "desktop-profile-sync.json"), "utf8")); }
 +  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-+  const profiles: Array<{ key: string; name: string; preset_type: string; setting: ProfileJson; legacy_id?: number; disk: string; file: string }> = [];
++  const candidates: Array<{ key: string; name: string; preset_type: string; setting: ProfileJson; legacy_id?: number; disk: string; file: string; modifiedAt: number }> = [];
++  for (const root of sourceRoots) {
 +  for (const [category, presetType, disk] of [["machine", "printer", "printers"], ["process", "process", "presets"], ["filament", "filament", "filaments"]]) {
 +    const dir = path.join(root, category);
 +    const files = await fs.readdir(dir, { recursive: true });
@@ -522,10 +529,26 @@ index 0000000..3c1430c
 +      if (category === "machine" && !setting.machine_start_gcode) throw new AppError(400, `${raw.name}: missing start G-code.`);
 +      if (category === "process" && !setting.compatible_printers) throw new AppError(400, `${raw.name}: missing compatible printers.`);
 +      const previous = legacy.find(p => path.resolve(p.source) === absolute && p.name === raw.name && p.type === presetType);
-+      profiles.push({ key: `${category}/${file.replaceAll("\\", "/")}`, name: raw.name, preset_type: presetType, setting, legacy_id: previous?.id, disk, file });
++      candidates.push({ key: `${category}/${raw.name}.json`, name: raw.name, preset_type: presetType, setting, legacy_id: previous?.id, disk, file, modifiedAt: (await fs.stat(absolute)).mtimeMs });
 +    }
 +  }
++  }
++  // Resolve all sources successfully before writing. Stable logical keys allow
++  // the winning instance to change without creating another managed profile.
++  const winners = new Map<string, typeof candidates[number]>();
++  for (const candidate of candidates) {
++    const identity = JSON.stringify([candidate.preset_type, candidate.name]);
++    const previous = winners.get(identity);
++    if (!previous || candidate.modifiedAt > previous.modifiedAt) winners.set(identity, candidate);
++  }
++  const profiles = [...winners.values()];
 +  if (!profiles.length) throw new AppError(400, "No saved desktop profiles were found.");
++  const targets = new Set<string>();
++  for (const profile of profiles) {
++    const target = `${profile.disk}/${profile.file}`;
++    if (targets.has(target)) throw new AppError(400, "Different desktop profiles share a snapshot filename. Rename their saved files before syncing.");
++    targets.add(target);
++  }
 +  // Resolve every profile before touching any saved snapshot.
 +  const backup = path.join(data, "profile-sync-backups", new Date().toISOString().replaceAll(":", "-"));
 +  for (const p of profiles) {
@@ -676,10 +699,10 @@ index 114a7a0..1be6ca1 100644
    try {
 diff --git a/tests/unit/desktop-sync.spec.ts b/tests/unit/desktop-sync.spec.ts
 new file mode 100644
-index 0000000..ccc07c9
+index 0000000..9a63511
 --- /dev/null
 +++ b/tests/unit/desktop-sync.spec.ts
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,54 @@
 +import { afterEach, describe, expect, it } from "vitest";
 +import fs from "node:fs/promises";
 +import os from "node:os";
@@ -694,6 +717,28 @@ index 0000000..ccc07c9
 +});
 +
 +describe("desktop profile sync", () => {
++  it("merges both sources, chooses newest duplicates, and keeps distinct names", async () => {
++    const root = await fs.mkdtemp(path.join(os.tmpdir(), "orca-merge-test-"));
++    roots.push(root);
++    const sources = [path.join(root, "one"), path.join(root, "two")];
++    process.env.DESKTOP_PROFILES_PATHS = JSON.stringify(sources);
++    process.env.BUNDLED_PROFILES_PATH = root;
++    process.env.DATA_PATH = path.join(root, "output");
++    for (const source of sources) {
++      for (const category of ["machine", "process", "filament"]) await fs.mkdir(path.join(source, category), { recursive: true });
++      const file = path.join(source, "process", "different-file-name.json");
++      await fs.writeFile(file, JSON.stringify({ name: "Shared", compatible_printers: ["Printer"], layer_height: source === sources[0] ? "0.2" : "0.3" }));
++      await fs.utimes(file, 100, source === sources[0] ? 100 : 200);
++    }
++    await fs.writeFile(path.join(sources[0], "process", "tuned.json"), JSON.stringify({ name: "Tuned", compatible_printers: ["Printer"] }));
++    const result = await desktopProfiles();
++    expect(result.profiles).toHaveLength(2);
++    expect(result.profiles.find(p => p.name === "Shared")?.setting.layer_height).toBe("0.3");
++    expect(result.profiles.find(p => p.name === "Shared")?.key).toBe("process/Shared.json");
++    process.env.DESKTOP_PROFILES_PATHS = JSON.stringify([sources[0], path.join(root, "missing")]);
++    await expect(desktopProfiles()).rejects.toThrow();
++  });
++
 +  it("requires the configured bearer token", () => {
 +    expect(authorizedSync(undefined, undefined)).toBe(false);
 +    expect(authorizedSync("Bearer wrong", "secret")).toBe(false);

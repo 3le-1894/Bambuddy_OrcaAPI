@@ -35,6 +35,11 @@ export interface DesktopProfileSyncResult {
   synced_at: string;
 }
 
+export interface DesktopProfileCleanupResult {
+  profiles: { id: number; name: string; preset_type: string; reasons: string[] }[];
+  removed: string[];
+}
+
 export type DesktopProfileSyncStatus = Omit<Partial<DesktopProfileSyncResult>, 'synced_at'> & {
   synced_at: string | null;
   profile_count: number;
@@ -8174,6 +8179,10 @@ export const api = {
   // Local Presets (OrcaSlicer imports)
   getDesktopProfileSyncStatus: () =>
     request<DesktopProfileSyncStatus>('/local-presets/desktop-sync/status'),
+  cleanupDesktopProfiles: (ids?: number[]) =>
+    request<DesktopProfileCleanupResult>('/local-presets/desktop-sync/cleanup', {
+      method: 'POST', body: JSON.stringify(ids ? { ids } : {}),
+    }),
   syncDesktopProfiles: () =>
     request<DesktopProfileSyncResult>(
       '/local-presets/desktop-sync', { method: 'POST' },

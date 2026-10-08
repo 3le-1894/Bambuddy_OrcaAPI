@@ -80,6 +80,56 @@ const mockLocalPresets = {
 };
 
 describe('LocalProfilesView', () => {
+  it('refreshes a stale missing warning after an empty cleanup preview', async () => {
+    const result = { added: 0, updated: 0, unchanged: 16, conflicts: [], missing: ['Already removed'], synced_at: '2026-10-07T20:00:00Z' };
+    let missing = ['Already removed'];
+    server.use(
+      http.get('/api/v1/local-presets/desktop-sync/status', () => HttpResponse.json({ ...result, missing, profile_count: 16, sidecar: { status: 'connected', version: '2.5.0-dev' } })),
+      http.post('/api/v1/local-presets/desktop-sync', () => HttpResponse.json(result)),
+      http.post('/api/v1/local-presets/desktop-sync/cleanup', () => {
+        missing = [];
+        return HttpResponse.json({ profiles: [], removed: [] });
+      }),
+    );
+    render(<LocalProfilesView />);
+    const syncButton = await screen.findByRole('button', { name: 'Sync now' });
+    await waitFor(() => expect(syncButton).toBeEnabled());
+    fireEvent.click(syncButton);
+    await screen.findByText('0 conflicts, 1 missing from desktop. Existing profiles kept.');
+    const cleanupButton = screen.getByRole('button', { name: 'Remove profiles deleted locally' });
+    await waitFor(() => expect(cleanupButton).toBeEnabled());
+    fireEvent.click(cleanupButton);
+    await screen.findByText('No deleted desktop profiles found.');
+    await waitFor(() => expect(screen.queryByText('0 conflicts, 1 missing from desktop. Existing profiles kept.')).not.toBeInTheDocument());
+  });
+
+  it('previews deleted copies and removes only an explicitly selected eligible profile', async () => {
+    const requests: unknown[] = [];
+    server.use(
+      http.get('/api/v1/local-presets/desktop-sync/status', () => HttpResponse.json({ synced_at: null, profile_count: 2, sidecar: { status: 'connected', version: '2.5.0-dev' } })),
+      http.post('/api/v1/local-presets/desktop-sync/cleanup', async ({ request }) => {
+        const body = await request.json() as { ids?: number[] };
+        requests.push(body);
+        return HttpResponse.json({ profiles: [
+          { id: 51, name: 'Deleted PLA', preset_type: 'filament', reasons: [] },
+          { id: 52, name: 'Edited PETG', preset_type: 'filament', reasons: ['Edited in farm manager'] },
+        ], removed: body.ids ? ['Deleted PLA'] : [] });
+      }),
+    );
+    render(<LocalProfilesView />);
+    const preview = await screen.findByRole('button', { name: 'Remove profiles deleted locally' });
+    await waitFor(() => expect(preview).toBeEnabled());
+    fireEvent.click(preview);
+    const eligible = await screen.findByRole('checkbox', { name: /Deleted PLA/ });
+    expect(screen.getByRole('checkbox', { name: /Edited PETG/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove selected copies (0)' })).toBeDisabled();
+    expect(requests).toEqual([{}]);
+    fireEvent.click(eligible);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove selected copies (1)' }));
+    await waitFor(() => expect(requests).toEqual([{}, { ids: [51] }]));
+    await waitFor(() => expect(screen.queryByRole('checkbox', { name: /Deleted PLA/ })).not.toBeInTheDocument());
+  });
+
   beforeEach(() => {
     server.use(
       http.get('/api/v1/local-presets/desktop-sync/status', () => HttpResponse.json({ synced_at: null, profile_count: 0, sidecar: { status: 'connected', version: '2.5.0-dev' } })),

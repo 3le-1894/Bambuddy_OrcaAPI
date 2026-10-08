@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, Loader2, ChevronDown, ChevronUp, AlertCircle, Layers } from 'lucide-react';
-import { api } from '../api/client';
+import { api, type DesktopProfileCleanupResult } from '../api/client';
 import { Button } from './Button';
 import { useToast } from '../contexts/ToastContext';
 
@@ -11,6 +11,34 @@ export function DesktopProfileSyncPanel({ importPending = false }: { importPendi
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [cleanupPreview, setCleanupPreview] = useState<DesktopProfileCleanupResult | null>(null);
+  const [selected, setSelected] = useState<number[]>([]);
+  const cleanup = useMutation({
+    mutationFn: (ids: number[] | undefined) => api.cleanupDesktopProfiles(ids),
+    onSuccess: (result, ids) => {
+      if (ids) {
+        showToast(`Removed ${result.removed.length} synced profiles.`, 'success');
+        setCleanupPreview(null);
+        setSelected([]);
+        sync.reset();
+        queryClient.invalidateQueries({ queryKey: ['localPresets'] });
+        queryClient.invalidateQueries({ queryKey: ['slicerPresets'] });
+        queryClient.invalidateQueries({ queryKey: ['desktopProfileSyncStatus'] });
+      } else {
+        setCleanupPreview(result);
+        setSelected([]);
+        // The last sync may precede a manual deletion from Local Profiles.
+        // Drop its cached result and refresh the retained-copy warning.
+        sync.reset();
+        queryClient.invalidateQueries({ queryKey: ['desktopProfileSyncStatus'] });
+      }
+    },
+    onError: (error: Error) => {
+      setCleanupPreview(null);
+      setSelected([]);
+      showToast(error.message, 'error');
+    },
+  });
   const { data: status, isPending, isFetching, isError, refetch } = useQuery({
     queryKey: ['desktopProfileSyncStatus'],
     queryFn: () => api.getDesktopProfileSyncStatus(),
@@ -25,6 +53,8 @@ export function DesktopProfileSyncPanel({ importPending = false }: { importPendi
       queryClient.invalidateQueries({ queryKey: ['desktopProfileSyncStatus'] });
       showToast(t('profiles.localProfiles.desktopSync.result', '{{updated}} updated, {{added}} added, {{unchanged}} unchanged.', { updated: result.updated, added: result.added, unchanged: result.unchanged }), result.conflicts.length ? 'warning' : 'success');
       setDetailsOpen(false);
+      setCleanupPreview(null);
+      setSelected([]);
     },
     onError: (error: Error) => showToast(error.message, 'error'),
   });
@@ -67,12 +97,34 @@ export function DesktopProfileSyncPanel({ importPending = false }: { importPendi
               {status?.profile_count != null && <> · {t('profiles.localProfiles.desktopSync.count', '{{count}} synced profiles', { count: status.profile_count })}</>}
             </p>
           </div>
-          <Button onClick={() => sync.mutate()} disabled={!connected || sync.isPending || importPending} className="w-full sm:w-auto shrink-0">
+          <Button onClick={() => sync.mutate()} disabled={!connected || sync.isPending || cleanup.isPending || importPending} className="w-full sm:w-auto shrink-0">
             {sync.isPending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="w-4 h-4" aria-hidden="true" />}
             {sync.isPending ? t('profiles.localProfiles.desktopSync.running', 'Syncing desktop profiles…') : t('profiles.localProfiles.desktopSync.syncNow', 'Sync now')}
           </Button>
         </div>
         <p className="text-sm text-bambu-gray">{t('profiles.localProfiles.desktopSync.saveHint', 'Save your changes in desktop Orca before syncing.')}</p>
+        <Button variant="ghost" size="sm" disabled={!connected || sync.isPending || cleanup.isPending || importPending} onClick={() => cleanup.mutate(undefined)}>
+          {cleanup.isPending ? 'Checking desktop profiles…' : 'Remove profiles deleted locally'}
+        </Button>
+        {cleanup.isError && <p role="alert" className="text-sm text-red-400">{cleanup.error.message}</p>}
+        {cleanupPreview && <div className="rounded-lg border border-bambu-dark-tertiary p-3 space-y-3" aria-label="Deleted desktop profiles">
+          <p className="text-sm text-bambu-gray">Select synced copies to remove from the farm manager. Edited or referenced profiles are protected. A backup is saved before removal.</p>
+          {cleanupPreview.profiles.length === 0 && <p className="text-sm text-bambu-gray">No deleted desktop profiles found.</p>}
+          <ul className="space-y-2 max-h-64 overflow-y-auto">
+            {cleanupPreview.profiles.map(profile => <li key={profile.id}>
+              <label className="flex items-start gap-2 text-sm text-white">
+                <input type="checkbox" disabled={cleanup.isPending || profile.reasons.length > 0} checked={selected.includes(profile.id)} onChange={event => setSelected(ids => event.target.checked ? [...ids, profile.id] : ids.filter(id => id !== profile.id))} />
+                <span className="break-words">{profile.name} <span className="text-bambu-gray">({profile.preset_type})</span>
+                  {profile.reasons.length > 0 && <span className="block text-amber-300">{profile.reasons.join('; ')}</span>}
+                </span>
+              </label>
+            </li>)}
+          </ul>
+          <div className="flex gap-2">
+            <Button size="sm" disabled={cleanup.isPending || selected.length === 0 || sync.isPending || importPending || !connected} onClick={() => cleanup.mutate(selected)}>Remove selected copies ({selected.length})</Button>
+            <Button size="sm" variant="ghost" disabled={cleanup.isPending} onClick={() => { setCleanupPreview(null); setSelected([]); }}>Cancel</Button>
+          </div>
+        </div>}
         {!isPending && !connected && <p className="text-sm text-amber-300">{t('profiles.localProfiles.desktopSync.connectionHint', 'Check the Windows Orca API service, then refresh the connection.')}</p>}
         {sync.isError && <p role="alert" className="text-sm text-red-400">{sync.error.message}</p>}
         {result && <>

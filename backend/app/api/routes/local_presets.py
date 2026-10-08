@@ -20,6 +20,7 @@ from backend.app.schemas.local_preset import (
     LocalPresetsResponse,
     LocalPresetUpdate,
 )
+from backend.app.services.desktop_profile_sync import DesktopCleanupRequest, cleanup_desktop_profiles
 from backend.app.services.orca_profiles import (
     extract_core_fields,
     get_cache_status,
@@ -52,6 +53,15 @@ async def desktop_sync(
     from backend.app.services.desktop_profile_sync import sync_desktop_profiles
 
     return await sync_desktop_profiles(db)
+
+
+@router.post("/desktop-sync/cleanup")
+async def desktop_sync_cleanup(
+    body: DesktopCleanupRequest,
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.SETTINGS_UPDATE),
+    db: AsyncSession = Depends(get_db),
+):
+    return await cleanup_desktop_profiles(db, body.ids)
 
 
 @router.get("/", response_model=LocalPresetsResponse)
