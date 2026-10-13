@@ -80,6 +80,7 @@ const defaultProps = {
 describe('ConfigureAmsSlotModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(localStorage.getItem).mockReturnValue(null);
     // Mock scrollIntoView which is not available in jsdom
     Element.prototype.scrollIntoView = vi.fn();
     (api.getCloudSettings as ReturnType<typeof vi.fn>).mockResolvedValue(mockCloudSettings);
@@ -94,6 +95,47 @@ describe('ConfigureAmsSlotModal', () => {
     (api.searchColors as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     (api.getColorCatalog as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     (api.resetAmsSlot as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true, message: 'ok' });
+  });
+
+  it.each([false, true])('hides built-ins and toggles them in fullscreen=%s', async (fullScreen) => {
+    vi.mocked(api.getBuiltinFilaments).mockResolvedValue([
+      { filament_id: 'GFG99', name: 'Generic PETG', filament_type: 'PETG' },
+    ]);
+    render(<ConfigureAmsSlotModal {...defaultProps} fullScreen={fullScreen} />);
+    const toggle = await screen.findByRole('checkbox', { name: 'Show built-in profiles' });
+    expect(toggle).not.toBeChecked();
+    expect(screen.queryByRole('button', { name: /Generic PETG/ })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(await screen.findByRole('button', { name: /Generic PETG/ })).toBeInTheDocument();
+    expect(localStorage.setItem).toHaveBeenCalledWith('amsSlot.showBuiltinProfiles', 'true');
+    fireEvent.click(toggle);
+    expect(screen.queryByRole('button', { name: /Generic PETG/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps an existing built-in selection visible while hiding other built-ins', async () => {
+    vi.mocked(api.getBuiltinFilaments).mockResolvedValue([
+      { filament_id: 'GFG99', name: 'Generic PETG', filament_type: 'PETG' },
+      { filament_id: 'GFA99', name: 'Generic ABS', filament_type: 'ABS' },
+    ]);
+    render(<ConfigureAmsSlotModal {...defaultProps}
+      slotInfo={{ ...defaultProps.slotInfo, savedPresetId: 'builtin_GFG99', trayType: 'PETG' }} />);
+    expect(await screen.findByRole('button', { name: /Generic PETG/ })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Show built-in profiles' })).not.toBeChecked();
+    expect(screen.queryByRole('button', { name: /Generic ABS/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('Search presets...'), { target: { value: 'does not match' } });
+    expect(screen.getByRole('button', { name: /Generic PETG/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show built-in profiles' }));
+    expect(screen.getByRole('checkbox', { name: 'Show built-in profiles' })).toBeChecked();
+  });
+
+  it('restores the built-in visibility preference for an external spool', async () => {
+    vi.mocked(localStorage.getItem).mockImplementation(key => key === 'amsSlot.showBuiltinProfiles' ? 'true' : null);
+    vi.mocked(api.getBuiltinFilaments).mockResolvedValue([
+      { filament_id: 'GFG99', name: 'Generic PETG', filament_type: 'PETG' },
+    ]);
+    render(<ConfigureAmsSlotModal {...defaultProps} slotInfo={{ ...defaultProps.slotInfo, amsId: 255 }} />);
+    expect(await screen.findByRole('checkbox', { name: 'Show built-in profiles' })).toBeChecked();
+    expect(screen.getByRole('button', { name: /Generic PETG/ })).toBeInTheDocument();
   });
 
   it('renders nothing visible when closed', () => {

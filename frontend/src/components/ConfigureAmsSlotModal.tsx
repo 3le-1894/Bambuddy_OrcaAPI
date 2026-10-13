@@ -295,6 +295,15 @@ export function ConfigureAmsSlotModal({
   const [colorHex, setColorHex] = useState<string>(''); // Just the 6-char hex, no alpha
   const [colorInput, setColorInput] = useState<string>(''); // User's text input (name or hex)
   const [searchQuery, setSearchQuery] = useState('');
+  const [showBuiltinProfiles, setShowBuiltinProfiles] = useState(() => {
+    try { return localStorage.getItem('amsSlot.showBuiltinProfiles') === 'true'; }
+    catch { return false; }
+  });
+  const changeBuiltinVisibility = (visible: boolean) => {
+    setShowBuiltinProfiles(visible);
+    try { localStorage.setItem('amsSlot.showBuiltinProfiles', String(visible)); }
+    catch { /* The display preference still works when storage is unavailable. */ }
+  };
   const [showSuccess, setShowSuccess] = useState(false);
   const [showExtendedColors, setShowExtendedColors] = useState(false);
   const scrolledToRef = useRef<string>('');
@@ -777,14 +786,16 @@ export function ConfigureAmsSlotModal({
     // 3. Built-in filament names (fallback — only add entries not already covered)
     if (builtinFilaments) {
       for (const bf of builtinFilaments) {
-        if (coveredIds.has(bf.filament_id)) continue;
+        const isSelected = selectedPresetId === `builtin_${bf.filament_id}`;
+        if (!isSelected && !showBuiltinProfiles) continue;
+        if (!isSelected && coveredIds.has(bf.filament_id)) continue;
         // Convert filament_id to setting_id format for cloud compatibility
         // e.g. "GFA00" → cloud setting_id would be "GFSA00" (insert S after GF)
         const settingId = bf.filament_id.startsWith('GF')
           ? 'GFS' + bf.filament_id.slice(2)
           : bf.filament_id;
-        if (coveredIds.has(settingId)) continue;
-        if (!query || bf.name.toLowerCase().includes(query)) {
+        if (!isSelected && coveredIds.has(settingId)) continue;
+        if (isSelected || !query || bf.name.toLowerCase().includes(query)) {
           items.push({ id: `builtin_${bf.filament_id}`, name: bf.name, source: 'builtin', isUser: false });
         }
       }
@@ -800,7 +811,26 @@ export function ConfigureAmsSlotModal({
       if (!a.isUser && b.isUser) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [orcaCloudList?.filament, cloudSettings?.filament, localPresets?.filament, builtinFilaments, searchQuery, printerModel, slotInfo.savedPresetId, slotInfo.trayInfoIdx, fullPrinterName, compatIndex, printerModelsData]);
+  }, [orcaCloudList?.filament, cloudSettings?.filament, localPresets?.filament, builtinFilaments, searchQuery, showBuiltinProfiles, selectedPresetId, printerModel, slotInfo.savedPresetId, slotInfo.trayInfoIdx, fullPrinterName, compatIndex, printerModelsData]);
+
+  const builtinVisibilityControls = (
+    <div className="mb-2 space-y-2 text-sm text-bambu-gray shrink-0">
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" checked={showBuiltinProfiles}
+          onChange={e => changeBuiltinVisibility(e.target.checked)} />
+        {t('configureAmsSlot.showBuiltinProfiles', 'Show built-in profiles')}
+      </label>
+      {!showBuiltinProfiles && !filteredPresets.some(preset => preset.source !== 'builtin') && (
+        <div>
+          <p>{t('configureAmsSlot.noCustomMatches', 'No local or cloud profiles match. Built-in profiles are hidden except for the current selection.')}</p>
+          <button type="button" className="text-bambu-green hover:underline"
+            onClick={() => changeBuiltinVisibility(true)}>
+            {t('configureAmsSlot.showBuiltinProfiles', 'Show built-in profiles')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   // Get full preset name for K profile filtering (brand + material, without printer suffix)
   const selectedPresetInfo = useMemo(() => {
@@ -1330,6 +1360,7 @@ export function ConfigureAmsSlotModal({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full px-3 py-2 bg-bambu-dark border border-bambu-dark-tertiary rounded-lg text-white placeholder:text-bambu-gray focus:border-bambu-green focus:outline-none mb-2 shrink-0"
                 />
+                {builtinVisibilityControls}
                 <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
                   {filteredPresets.length === 0 ? (
                     <p className="text-center py-4 text-bambu-gray">
@@ -1576,6 +1607,7 @@ export function ConfigureAmsSlotModal({
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full px-3 py-2 bg-bambu-dark border border-bambu-dark-tertiary rounded-lg text-white placeholder:text-bambu-gray focus:border-bambu-green focus:outline-none mb-2"
                   />
+                  {builtinVisibilityControls}
                   <div className="max-h-48 overflow-y-auto space-y-1">
                     {filteredPresets.length === 0 ? (
                       <p className="text-center py-4 text-bambu-gray">
