@@ -56,6 +56,33 @@ function parseVendorFromName(name: string): string | null {
   return null;
 }
 
+type ProfileGrouping = 'none' | 'printer' | 'material' | 'brand';
+const GROUPING_STORAGE_KEY = 'localProfiles.groupBy';
+const GROUPING_OPTIONS: ProfileGrouping[] = ['none', 'printer', 'material', 'brand'];
+
+function readGrouping(): ProfileGrouping {
+  try {
+    const saved = localStorage.getItem(GROUPING_STORAGE_KEY);
+    return GROUPING_OPTIONS.includes(saved as ProfileGrouping) ? saved as ProfileGrouping : 'none';
+  } catch { return 'none'; }
+}
+
+function profileGroupLabels(preset: LocalPreset, mode: ProfileGrouping): string[] {
+  if (mode === 'printer') {
+    if (preset.preset_type === 'printer') return [preset.name];
+    try {
+      const compatible: unknown = JSON.parse(preset.compatible_printers || 'null');
+      if (Array.isArray(compatible)) {
+        return [...new Set(compatible.filter((name): name is string => typeof name === 'string' && !!name.trim()).map(name => name.trim()))];
+      }
+    } catch { /* Invalid compatibility metadata belongs in Unspecified. */ }
+    return [];
+  }
+  // Material and brand describe filament metadata, not process/printer names.
+  const value = mode === 'material' ? preset.filament_type : preset.filament_vendor;
+  return value?.trim() ? [value.trim()] : [];
+}
+
 function PresetCard({
   preset,
   onDelete,
@@ -225,6 +252,14 @@ export function LocalProfilesView() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  const [groupBy, setGroupBy] = useState<ProfileGrouping>(readGrouping);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const unspecified = t('profiles.localProfiles.groupUnspecified', 'Unspecified');
+  const changeGrouping = (value: ProfileGrouping) => {
+    setGroupBy(value);
+    setCollapsedGroups(new Set());
+    try { localStorage.setItem(GROUPING_STORAGE_KEY, value); } catch { /* Storage may be unavailable. */ }
+  };
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
@@ -326,6 +361,45 @@ export function LocalProfilesView() {
   const filaments = useMemo(() => filterPresets(presets?.filament || []), [presets?.filament, filterPresets]);
   const printers = useMemo(() => filterPresets(presets?.printer || []), [presets?.printer, filterPresets]);
   const processes = useMemo(() => filterPresets(presets?.process || []), [presets?.process, filterPresets]);
+  const groupPresets = (items: LocalPreset[]) => {
+    const groups = new Map<string, LocalPreset[]>();
+    for (const preset of items) {
+      const labels = profileGroupLabels(preset, groupBy);
+      for (const label of labels.length ? labels : ['']) {
+        groups.set(label, [...(groups.get(label) || []), preset]);
+      }
+    }
+    return [...groups].sort(([a], [b]) => a === '' ? 1 : b === '' ? -1 : a.localeCompare(b));
+  };
+  const groupKey = (type: string, label: string) => JSON.stringify([groupBy, type, label]);
+  const renderPresets = (items: LocalPreset[], type: string) => {
+    const cards = (entries: LocalPreset[]) => entries.map(p => (
+      <PresetCard key={p.id} preset={p} onDelete={setDeleteConfirm}
+        onExpand={setExpandedId} isExpanded={expandedId === p.id} />
+    ));
+    if (groupBy === 'none') return cards(items);
+    return groupPresets(items).map(([label, entries]) => {
+      const key = groupKey(type, label);
+      // Keep search matches visible even in a previously collapsed group.
+      const collapsed = collapsedGroups.has(key) && !searchQuery.trim();
+      return (
+        <section key={key} className="space-y-2">
+          <button type="button" aria-expanded={!collapsed} disabled={!!searchQuery.trim()}
+            className="flex w-full items-center gap-2 rounded-lg bg-bambu-dark-secondary p-2 text-left text-sm text-white"
+            onClick={() => setCollapsedGroups(previous => {
+              const next = new Set(previous);
+              if (next.has(key)) next.delete(key); else next.add(key);
+              return next;
+            })}>
+            {collapsed ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronUp className="w-4 h-4 shrink-0" />}
+            <span className="min-w-0 break-words">{label || unspecified}</span>
+            <span className="text-bambu-gray">({entries.length})</span>
+          </button>
+          {!collapsed && <div className="space-y-2">{cards(entries)}</div>}
+        </section>
+      );
+    });
+  };
   const totalCount = filaments.length + printers.length + processes.length;
   // Count of imported presets BEFORE the search filter â€” drives whether the
   // search bar shows at all. Gating the search bar on totalCount (post-filter)
@@ -396,6 +470,31 @@ export function LocalProfilesView() {
         </div>
       )}
 
+      {hasAnyPresets && (
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-bambu-gray">
+            {t('profiles.localProfiles.groupBy', 'Group by')}
+            <select value={groupBy} onChange={e => changeGrouping(e.target.value as ProfileGrouping)}
+              className="rounded-lg border border-bambu-dark-tertiary bg-bambu-dark px-3 py-2 text-white">
+              <option value="none">{t('profiles.localProfiles.groupNone', 'None')}</option>
+              <option value="printer">{t('profiles.localProfiles.groupPrinter', 'Compatible printer')}</option>
+              <option value="material">{t('profiles.localProfiles.groupMaterial', 'Material')}</option>
+              <option value="brand">{t('profiles.localProfiles.groupBrand', 'Brand')}</option>
+            </select>
+          </label>
+          {groupBy !== 'none' && <>
+            <Button variant="secondary" onClick={() => setCollapsedGroups(new Set())}>
+              {t('profiles.localProfiles.expandGroups', 'Expand all')}
+            </Button>
+            <Button variant="secondary" disabled={!!searchQuery.trim()} onClick={() => setCollapsedGroups(new Set(
+              [filaments, processes, printers].flatMap(items => groupPresets(items).map(([label]) => groupKey(items[0].preset_type, label)))
+            ))}>
+              {t('profiles.localProfiles.collapseGroups', 'Collapse all')}
+            </Button>
+          </>}
+        </div>
+      )}
+
       {/* No presets imported at all */}
       {!hasAnyPresets && !isLoading && (
         <div className="text-center py-12">
@@ -427,15 +526,7 @@ export function LocalProfilesView() {
                 <span className="text-xs text-bambu-gray">({filaments.length})</span>
               </div>
               <div className="space-y-2">
-                {filaments.map(p => (
-                  <PresetCard
-                    key={p.id}
-                    preset={p}
-                    onDelete={(id) => setDeleteConfirm(id)}
-                    onExpand={setExpandedId}
-                    isExpanded={expandedId === p.id}
-                  />
-                ))}
+                {renderPresets(filaments, 'filament')}
               </div>
             </div>
           )}
@@ -451,15 +542,7 @@ export function LocalProfilesView() {
                 <span className="text-xs text-bambu-gray">({processes.length})</span>
               </div>
               <div className="space-y-2">
-                {processes.map(p => (
-                  <PresetCard
-                    key={p.id}
-                    preset={p}
-                    onDelete={(id) => setDeleteConfirm(id)}
-                    onExpand={setExpandedId}
-                    isExpanded={expandedId === p.id}
-                  />
-                ))}
+                {renderPresets(processes, 'process')}
               </div>
             </div>
           )}
@@ -475,15 +558,7 @@ export function LocalProfilesView() {
                 <span className="text-xs text-bambu-gray">({printers.length})</span>
               </div>
               <div className="space-y-2">
-                {printers.map(p => (
-                  <PresetCard
-                    key={p.id}
-                    preset={p}
-                    onDelete={(id) => setDeleteConfirm(id)}
-                    onExpand={setExpandedId}
-                    isExpanded={expandedId === p.id}
-                  />
-                ))}
+                {renderPresets(printers, 'printer')}
               </div>
             </div>
           )}

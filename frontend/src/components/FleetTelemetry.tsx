@@ -28,6 +28,5 @@ export function FleetTelemetry({ status, active, failed = false }: {
       {status.bed && <p>Bed: {temperature(status.bed)}</p>}
       {status.chamber && <p>Chamber: {temperature(status.chamber)}</p>}
     </div>}
-    <p className="text-xs text-bambu-gray">Monitoring only. Print controls are not yet available.</p>
   </div>;
 }

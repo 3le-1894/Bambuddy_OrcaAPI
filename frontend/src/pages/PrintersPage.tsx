@@ -1,6 +1,7 @@
 import { PrinterConnectionFields } from '../components/PrinterConnectionFields';
 import { connectionPayload } from '../utils/printerConnection';
 import { FleetTelemetry } from '../components/FleetTelemetry';
+import { FleetPrintControls } from '../components/FleetPrintControls';
 import { useFleetStatuses } from '../hooks/useFleetStatuses';
 import { fleetDashboardStatus } from '../utils/fleetDashboardStatus';
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
@@ -2065,6 +2066,8 @@ function ConfiguredPrinterCard({ printer, hideIfDisconnected }: { printer: Print
       {printer.connection_type === 'klipper'
         ? <FleetTelemetry status={status} active={printer.is_active} failed={fleet.isError} />
         : <p className="text-sm text-amber-400 mt-2">Configuration only — adapter not yet available</p>}
+      {printer.connection_type === 'klipper' && <FleetPrintControls printerId={printer.id}
+        status={status} active={printer.is_active} failed={fleet.isError} />}
       {printer.location && <p className="text-sm text-bambu-gray">{printer.location}</p>}
       <div className="flex gap-2 mt-4">
         {hasPermission('printers:update') && <Button onClick={() => setEditing(true)}>Edit configuration</Button>}

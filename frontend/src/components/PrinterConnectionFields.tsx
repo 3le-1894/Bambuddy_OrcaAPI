@@ -25,7 +25,7 @@ export function PrinterConnectionFields({ value, onChange, editing = false, hasS
     </div>
     {type !== 'bambu' && <>
       <p className="text-sm text-amber-400" role="status">{type === 'klipper'
-        ? 'Live monitoring through Moonraker. Print controls are not yet available.'
+        ? 'Live monitoring and pause, resume, and cancel controls through Moonraker.'
         : 'Configuration only. Monitoring and print controls will become available when this adapter is added.'}</p>
       <div>
         <label htmlFor="printer_api_url" className="block text-sm text-bambu-gray mb-1">Server URL</label>

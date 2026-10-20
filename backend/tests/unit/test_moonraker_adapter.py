@@ -104,7 +104,7 @@ async def test_background_http_auth_prefix_discovery_cache_and_resource_cleanup(
         await asyncio.sleep(0.03)
         assert sum(r.url.path.endswith("objects/list") for r in requests) == 1
         assert all(r.url.path.startswith("/proxy/") for r in requests)
-        assert not adapter.capabilities.pause and not await adapter.pause()
+        assert not adapter.capabilities.pause
         http = adapter._http
     finally:
         await adapter.stop()

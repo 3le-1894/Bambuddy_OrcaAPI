@@ -37,6 +37,8 @@ from backend.app.schemas.printer import (
     DiagnosticRequest,
     ExtruderSlotResponse,
     FilaSwitchResponse,
+    FleetPrintAction,
+    FleetPrintControlRequest,
     HmsActionBody,
     NozzleInfoResponse,
     NozzleRackSlot,
@@ -67,6 +69,7 @@ from backend.app.services.printer_adapter import (
     FleetPrinterStatus,
     PrinterActivity,
     PrinterCapabilities,
+    PrinterControlError,
     PrinterReadiness,
 )
 from backend.app.services.printer_diagnostic import run_connection_diagnostic
@@ -115,7 +118,13 @@ async def require_available_printer_transport(request: Request, db: AsyncSession
     if printer_id is None:
         return
     route = request.scope.get("route")
-    if getattr(route, "name", "") in {"get_printer", "update_printer", "delete_printer", "get_printer_status"}:
+    if getattr(route, "name", "") in {
+        "get_printer",
+        "update_printer",
+        "delete_printer",
+        "get_printer_status",
+        "run_fleet_control",
+    }:
         return
     try:
         printer_id = int(printer_id)
@@ -3672,6 +3681,51 @@ async def debug_simulate_print_complete(
 # =============================================================================
 # Print Control Endpoints
 # =============================================================================
+
+
+@router.post("/{printer_id}/fleet-control/{action}")
+async def run_fleet_control(
+    printer_id: int,
+    action: FleetPrintAction,
+    control: FleetPrintControlRequest,
+    _=RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_CONTROL),
+    db: AsyncSession = Depends(get_db),
+):
+    """Control the selected Klipper job through its common adapter."""
+    printer = (await db.execute(select(Printer).where(Printer.id == printer_id))).scalar_one_or_none()
+    if printer is None:
+        raise HTTPException(404, "Printer not found")
+    if printer.connection_type != "klipper":
+        raise HTTPException(409, "Fleet print controls are currently available for Klipper only")
+    if not printer.is_active:
+        raise HTTPException(409, "Printer monitoring is disabled")
+    if action == "cancel" and not control.confirmed:
+        raise HTTPException(409, "Confirm cancellation before sending the command")
+    adapter = printer_manager.get_adapter(printer_id)
+    status = printer_manager.get_fleet_status(printer_id)
+    if adapter is None or status is None or not status.connected:
+        raise HTTPException(503, "Current printer status is unavailable")
+    if not getattr(adapter.capabilities, action):
+        raise HTTPException(409, "This printer configuration does not support this command")
+    allowed = {
+        "pause": (PrinterActivity.PRINTING,),
+        "resume": (PrinterActivity.PAUSED,),
+        "cancel": (PrinterActivity.PRINTING, PrinterActivity.PAUSED),
+    }
+    if status.readiness != PrinterReadiness.BUSY or status.activity not in allowed[action]:
+        raise HTTPException(409, "This command is unavailable in the current printer state")
+    if status.filename != control.expected_filename:
+        raise HTTPException(409, "The active print changed; refresh the card before controlling it")
+    try:
+        accepted = await getattr(adapter, action)()
+    except PrinterControlError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from None
+    except Exception:
+        logger.warning("Fleet print command failed for printer %s", printer_id)
+        raise HTTPException(502, "Print command failed; check printer state before retrying") from None
+    if not accepted:
+        raise HTTPException(502, "Printer did not accept the command")
+    return {"success": True, "message": f"{action.capitalize()} command accepted; waiting for printer status"}
 
 
 @router.post("/{printer_id}/print/stop")

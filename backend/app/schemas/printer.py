@@ -9,6 +9,12 @@ from backend.app.utils.printer_models import supports_nozzle_flow_type
 ConnectionType = Literal["bambu", "klipper", "duet"]
 AuthMode = Literal["none", "api_key", "password"]
 DuetMode = Literal["standalone", "sbc"]
+FleetPrintAction = Literal["pause", "resume", "cancel"]
+
+
+class FleetPrintControlRequest(BaseModel):
+    expected_filename: str = Field(min_length=1, max_length=1024)
+    confirmed: bool = False
 
 
 def validate_printer_api_url(value: str | None) -> str | None:

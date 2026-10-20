@@ -457,26 +457,106 @@ index edadf90..859841b 100644
    });
  }
 diff --git a/src/routes/health/health.service.ts b/src/routes/health/health.service.ts
-index 18fbfdc..499b269 100644
+index 18fbfdc..f3aeff8 100644
 --- a/src/routes/health/health.service.ts
 +++ b/src/routes/health/health.service.ts
-@@ -48,11 +48,14 @@ export async function checkHealth(): Promise<HealthCheck> {
-       const helpOutput = execFileSync(orcaPath, ["--help"], {
-         encoding: "utf-8",
-         timeout: 5000,
-+        windowsHide: true,
-       });
+@@ -1,4 +1,4 @@
+-import { execFileSync } from "child_process";
++import { spawn } from "child_process";
+ import { promises as fs } from "fs";
+ import * as path from "path";
  
-       // Extract version from output like "OrcaSlicer-2.3.1:" or "OrcaSlicer-01.10.01.50:"
+@@ -18,11 +18,53 @@ export interface HealthCheck {
+   };
+ }
+ 
+-/** The child-process exit code `execFileSync` hangs off the error it throws. */
+-function exitStatusOf(error: unknown): number | undefined {
+-  if (typeof error !== "object" || error === null) return undefined;
+-  const status = (error as { status?: unknown }).status;
+-  return typeof status === "number" ? status : undefined;
++// A hung CLI must not block Express or outlive Bambuddy's health-request timeout.
++const HELP_TIMEOUT_MS = 3000;
++const MAX_HELP_BYTES = 128 * 1024;
++let probe: { key: string; expires: number; result: Promise<string> } | undefined;
++
++function probeVersion(orcaPath: string): Promise<string> {
++  const key = JSON.stringify([orcaPath, process.env.ORCASLICER_VERSION]);
++  if (probe?.key === key && probe.expires > Date.now()) return probe.result;
++  const result = new Promise<string>((resolve, reject) => {
++    const child = spawn(orcaPath, ["--help"], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
++    let output = "";
++    let bytes = 0;
++    let settled = false;
++    const finish = (error?: Error) => {
++      if (settled) return;
++      settled = true;
++      clearTimeout(timer);
++      if (error) {
++        // Resolve the deadline independently of child exit/pipe closure.
++        child.kill("SIGKILL");
++        child.stdout.destroy();
++        child.stderr.destroy();
++        child.unref();
++        reject(error);
++      } else {
++        resolve(output.match(/OrcaSlicer-([\d.]+(?:-[\w.]+)?)/)?.[1]
++          || process.env.ORCASLICER_VERSION || "unknown");
++      }
++    };
++    const timer = setTimeout(() => finish(new Error("OrcaSlicer --help timed out after 3000 ms")), HELP_TIMEOUT_MS);
++    child.stdout.on("data", (data: Buffer) => {
++      bytes += data.length;
++      if (bytes > MAX_HELP_BYTES) finish(new Error("OrcaSlicer --help output exceeded limit"));
++      else output += data.toString("utf-8");
++    });
++    child.stderr.resume();
++    child.on("error", error => finish(error));
++    child.on("close", code => finish(code === 0 ? undefined : new Error(`OrcaSlicer exited with code ${code}`)));
++  });
++  const entry = { key, expires: Infinity, result };
++  probe = entry;
++  // Share concurrent requests and avoid repeatedly launching the GUI executable.
++  void result.then(
++    () => { entry.expires = Date.now() + 30_000; },
++    () => { entry.expires = Date.now() + 5_000; },
++  );
++  return result;
+ }
+ 
+ function messageOf(error: unknown): string {
+@@ -45,29 +87,13 @@ export async function checkHealth(): Promise<HealthCheck> {
+     await fs.access(orcaPath, fs.constants.X_OK);
+     
+     try {
+-      const helpOutput = execFileSync(orcaPath, ["--help"], {
+-        encoding: "utf-8",
+-        timeout: 5000,
+-      });
++      const version = await probeVersion(orcaPath);
+ 
+-      // Extract version from output like "OrcaSlicer-2.3.1:" or "OrcaSlicer-01.10.01.50:"
 -      const versionMatch = helpOutput.match(/OrcaSlicer-([\d.]+)/);
 -      const version = versionMatch ? versionMatch[1] : "unknown";
-+      const versionMatch = helpOutput.match(/OrcaSlicer-([\d.]+(?:-[\w.]+)?)/);
-+      // Windows GUI executables can return an empty --help stream. The
-+      // snapshot builder records the version of the copied Orca build.
-+      const version = versionMatch?.[1] || process.env.ORCASLICER_VERSION || "unknown";
-       
+-      
        checks.orcaslicer.available = true;
        checks.orcaslicer.version = version;
+     } catch (versionError) {
+-      // `execFileSync` throws an Error decorated with the child's exit
+-      // `status`. That property is not on the Error type, so read it through
+-      // a narrow guard rather than widening the whole binding to `any` —
+-      // a non-zero exit and a failure to spawn at all are different things
+-      // and the message should say which happened.
+-      const exitStatus = exitStatusOf(versionError);
+       checks.orcaslicer.available = false;
+-      checks.orcaslicer.error =
+-        exitStatus !== undefined && exitStatus !== 0
+-          ? `OrcaSlicer exited with code ${exitStatus}: ${messageOf(versionError)}`
+-          : messageOf(versionError);
++      checks.orcaslicer.error = messageOf(versionError);
+     }
+   } catch (error) {
+     checks.orcaslicer.available = false;
 diff --git a/src/routes/profiles/desktop-sync.ts b/src/routes/profiles/desktop-sync.ts
 new file mode 100644
 index 0000000..3202024
@@ -799,3 +879,115 @@ index 5cc1cd9..a771643 100644
  describe("mergeProfiles", () => {
    it("child fields override parent fields key-by-key", () => {
      const parent: ProfileJson = { foo: "parent", bar: "kept" };
+diff --git a/tests/unit/health.service.spec.ts b/tests/unit/health.service.spec.ts
+new file mode 100644
+index 0000000..364a063
+--- /dev/null
++++ b/tests/unit/health.service.spec.ts
+@@ -0,0 +1,106 @@
++import { EventEmitter } from "node:events";
++import { PassThrough } from "node:stream";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++
++const mocks = vi.hoisted(() => ({ spawn: vi.fn(), access: vi.fn() }));
++vi.mock("child_process", () => ({ spawn: mocks.spawn }));
++vi.mock("fs", () => ({ promises: { access: mocks.access, constants: { X_OK: 1, R_OK: 4, W_OK: 2 } } }));
++
++function fakeChild() {
++  return Object.assign(new EventEmitter(), {
++    stdout: new PassThrough(), stderr: new PassThrough(),
++    kill: vi.fn(), unref: vi.fn(),
++  });
++}
++const originalVersion = process.env.ORCASLICER_VERSION;
++beforeEach(() => {
++  vi.resetModules();
++  vi.useFakeTimers();
++  mocks.access.mockReset().mockResolvedValue(undefined);
++  mocks.spawn.mockReset();
++  process.env.ORCASLICER_VERSION = "2.5.0-dev";
++});
++afterEach(() => {
++  vi.useRealTimers();
++  if (originalVersion === undefined) delete process.env.ORCASLICER_VERSION;
++  else process.env.ORCASLICER_VERSION = originalVersion;
++});
++
++async function begin() {
++  const child = fakeChild();
++  mocks.spawn.mockReturnValue(child);
++  const { checkHealth } = await import("../../src/routes/health/health.service");
++  const pending = checkHealth();
++  await vi.advanceTimersByTimeAsync(0);
++  return { child, pending, checkHealth };
++}
++
++describe("sidecar health", () => {
++  it("reports CLI version and shares/caches the probe", async () => {
++    const { child, pending, checkHealth } = await begin();
++    const concurrent = checkHealth();
++    await vi.advanceTimersByTimeAsync(0);
++    child.stdout.write("OrcaSlicer-2.5.0-dev:");
++    child.emit("close", 0);
++    expect((await pending).checks.orcaslicer.version).toBe("2.5.0-dev");
++    expect((await concurrent).status).toBe("healthy");
++    await checkHealth();
++    expect(mocks.spawn).toHaveBeenCalledTimes(1);
++  });
++
++  it("uses snapshot version for Windows GUI executables with empty stdout", async () => {
++    const { child, pending } = await begin();
++    child.emit("close", 0);
++    expect((await pending).checks.orcaslicer.version).toBe("2.5.0-dev");
++  });
++
++  it("returns at the deadline even when the child never emits close", async () => {
++    const { child, pending, checkHealth } = await begin();
++    await vi.advanceTimersByTimeAsync(3000);
++    expect((await pending).status).toBe("unhealthy");
++    expect((await pending).checks.orcaslicer.error).toContain("timed out");
++    expect(child.kill).toHaveBeenCalledWith("SIGKILL");
++    expect(child.unref).toHaveBeenCalled();
++    expect(child.stdout.destroyed).toBe(true);
++    await checkHealth();
++    expect(mocks.spawn).toHaveBeenCalledTimes(1);
++    await vi.advanceTimersByTimeAsync(5001);
++    const retry = checkHealth();
++    await vi.advanceTimersByTimeAsync(0);
++    child.emit("close", 0);
++    expect((await retry).status).toBe("healthy");
++    expect(mocks.spawn).toHaveBeenCalledTimes(2);
++  });
++
++  it("keeps the event loop available while the CLI is running", async () => {
++    const { child, pending } = await begin();
++    let serviced = false;
++    setTimeout(() => { serviced = true; }, 1);
++    await vi.advanceTimersByTimeAsync(1);
++    expect(serviced).toBe(true);
++    child.emit("close", 0);
++    expect((await pending).status).toBe("healthy");
++  });
++
++  it("reports nonzero exits and spawn errors", async () => {
++    const { child, pending } = await begin();
++    child.emit("error", new Error("spawn denied"));
++    child.emit("close", 1);
++    expect((await pending).checks.orcaslicer.error).toBe("spawn denied");
++  });
++
++  it("reports a nonzero CLI exit without marking the slicer available", async () => {
++    const { child, pending } = await begin();
++    child.emit("close", 2);
++    expect((await pending).checks.orcaslicer).toMatchObject({ available: false, error: "OrcaSlicer exited with code 2" });
++  });
++
++  it("reports inaccessible executable/data directories", async () => {
++    mocks.access.mockRejectedValue(new Error("not accessible"));
++    const { checkHealth } = await import("../../src/routes/health/health.service");
++    const result = await checkHealth();
++    expect(result.status).toBe("unhealthy");
++    expect(result.checks.dataPath.accessible).toBe(false);
++    expect(mocks.spawn).not.toHaveBeenCalled();
++  });
++});

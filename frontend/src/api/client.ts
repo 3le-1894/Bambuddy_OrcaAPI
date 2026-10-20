@@ -25,6 +25,8 @@ export interface FleetTemperature {
   target: number | null;
 }
 
+export type FleetPrintAction = 'pause' | 'resume' | 'cancel';
+
 export interface DesktopProfileSyncResult {
   added: number;
   updated: number;
@@ -4935,6 +4937,10 @@ export const api = {
   getPrinterStatus: (id: number) =>
     request<PrinterStatus>(`/printers/${id}/status`),
   getFleetStatuses: () => request<Record<number, FleetPrinterStatus>>('/printers/fleet-status'),
+  controlFleetPrint: (id: number, action: FleetPrintAction, expectedFilename: string, confirmed = false) =>
+    request<{ success: boolean; message: string }>(`/printers/${id}/fleet-control/${action}`, {
+      method: 'POST', body: JSON.stringify({ expected_filename: expectedFilename, confirmed }),
+    }),
   refreshPrinterStatus: (id: number) =>
     request<{ status: string }>(`/printers/${id}/refresh-status`, {
       method: 'POST',

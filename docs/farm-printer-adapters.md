@@ -75,7 +75,7 @@ client registry; lifecycle changes must use these async methods, not the legacy
 `disconnect_printer`/`disconnect_all` methods. Application shutdown now awaits
 managed adapters before disconnecting Bambu clients.
 
-Duet standalone/SBC adapters, Moonraker controls and WebSocket subscriptions
+Duet standalone/SBC adapters, file upload/start and WebSocket subscriptions
 remain future work. Retain legacy Bambu state for AMS and other vendor-specific
 features; do not force other adapters to fabricate it.
 
@@ -128,8 +128,8 @@ for this source change.
 
 `MoonrakerPrinterAdapter` uses one async HTTP client per active Klipper entry,
 with the saved API key in `X-Api-Key` when configured. It preserves proxy URL
-prefixes, does not follow redirects or use environment proxies, and never sends
-print commands. The background poll checks `/server/info`, discovers available
+prefixes and does not follow redirects or use environment proxies. Background
+monitoring never sends print commands. The background poll checks `/server/info`, discovers available
 objects once, then queries their status every five seconds. Object discovery
 is repeated after failures or Klipper restarts. Timeouts and retry/backoff come
 from the polling base. Stopping/replacing/removing the adapter awaits its task
@@ -163,9 +163,52 @@ cover state/unit mapping, multi-extruder readings, malformed responses, auth
 headers, proxy paths, cache-only reads, discovery reuse, timeout cancellation,
 HTTP resource cleanup, settings lifecycle and dashboard rendering. Live testing
 requires a Pi with Klipper and Moonraker reachable from the Bambuddy container.
-Print upload/start, pause/resume/cancel, cameras, print archiving, Moonraker
-WebSockets and Duet monitoring are not part of this patch.
+Print upload/start, cameras, print archiving, Moonraker WebSockets and Duet
+monitoring remain future work. Pause/resume/cancel controls are described below.
 
 API references: [Moonraker printer administration](https://moonraker.readthedocs.io/en/latest/external_api/printer/),
 [printer objects](https://moonraker.readthedocs.io/en/latest/printer_objects/),
 and [HTTP API authentication](https://moonraker.readthedocs.io/en/latest/external_api/introduction/).
+
+## Moonraker print controls
+
+The Klipper card offers Pause while printing, Resume while paused, and Cancel
+print for either state. Cancel requires a separate confirmation that names the
+file. Changing files, losing connectivity, or losing control permission clears
+the prompt. Unsupported operations, inactive monitoring, stale/unavailable
+status, non-busy readiness and Klipper errors do not offer actionable buttons.
+Buttons are disabled during submission. API failures appear on the card and
+are not automatically retried. Success means Moonraker acknowledged submission;
+only subsequent telemetry confirms the physical state.
+
+`POST /api/v1/printers/{printer_id}/fleet-control/{action}` accepts pause, resume
+or cancel with JSON `expected_filename` and, for cancellation, `confirmed:true`.
+It requires printers:control and enforces an API key's per-printer allowlist.
+The endpoint currently accepts only Klipper entries. Legacy Bambu endpoints
+continue using their existing code, and Duet remains configuration-only.
+
+The route checks cached status and capabilities. The adapter then checks fresh
+Moonraker status and the filename again before sending one dedicated
+`/printer/print/pause`, `/resume`, or `/cancel` POST. This checks state and
+filename; Moonraker does not provide an atomic compare-and-command transaction,
+so it cannot distinguish two successive jobs with the same filename in every
+case. Capabilities require the discovered print_stats, virtual_sdcard and
+pause_resume objects. No raw G-code command endpoint is added.
+
+HTTP polls and commands share an I/O lock. Only one command is accepted at a
+time; concurrent submissions receive a conflict instead of accumulating a
+command queue. After acknowledgment or an uncertain transport outcome, another
+command is blocked until telemetry shows its result, a different filename, a
+terminal state, or 60 seconds have passed. Commands have a total request
+deadline and are never automatically retried. Timeouts return 504 with an
+unknown-outcome message; malformed acknowledgments and transport failures
+return safe 502 messages. After uncertain failures, the snapshot is offline
+until monitoring refreshes it. Shutdown marks the adapter as stopping, rejects
+new commands and awaits any in-flight request before closing the HTTP client.
+
+Tests use MockTransport and temporary databases. They cover authenticated proxy
+paths, allowed/forbidden states, changed files, missing capabilities, duplicate
+submissions, deadline cancellation, safe errors, shutdown behavior, permissions,
+API-key printer scope, and UI confirmation/error flows. No commands were sent
+to a physical printer during development. Physical verification still requires
+a configured Klipper printer connected to Athena.

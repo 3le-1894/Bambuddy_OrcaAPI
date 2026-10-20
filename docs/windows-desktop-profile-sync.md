@@ -125,3 +125,21 @@ Do not use the official image's pull/update workflow for this fork.
 
 Desktop profile sync does not update the Orca executable or bundled resource
 tree. Refresh the sidecar runtime separately after building a new desktop Orca.
+
+## Grouping local profiles
+
+The Local Profiles list offers **Group by: None, Compatible printer, Material,
+or Brand** while keeping the Filament, Process and Printer columns. Groups have
+counts and can be collapsed individually or with Expand all / Collapse all.
+The browser remembers the grouping choice; collapsed state resets on reload.
+
+Compatible printer groups use the saved `compatible_printers` metadata. Profiles
+compatible with multiple printers appear in each group, but column totals count
+each profile once. Printer profiles group by their own names. Missing, empty or
+invalid compatibility metadata goes under Unspecified; profile name suffixes are
+not used to guess compatibility. Material and Brand use saved filament metadata;
+profiles without those fields appear under Unspecified.
+
+Searching temporarily opens matching groups. Group collapse controls are disabled
+while searching, and the previous collapsed state returns when search is cleared.
+Grouping is a display preference and does not change profiles or sync behavior.

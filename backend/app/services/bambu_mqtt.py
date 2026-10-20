@@ -2189,6 +2189,34 @@ class BambuMQTTClient:
         self._debug_last[key] = value
         logger.debug(msg, *args)
 
+    def _merge_external_trays(self, updates: list) -> list:
+        """Merge incremental external-spool fields without guessing dual-slot IDs.
+
+        P1S can send just [{"nozzle_temp_min": "220"}]. Missing identity fields
+        mean unchanged, not an empty spool. Explicit empty values still clear it.
+        """
+        previous = self.state.raw_data.get("vt_tray") or []
+        if not updates:
+            return []
+        if not isinstance(previous, list):
+            previous = [previous] if isinstance(previous, dict) else []
+        merged = [dict(tray) for tray in previous if isinstance(tray, dict)]
+        for update in updates:
+            if not isinstance(update, dict):
+                continue
+            tray_id = update.get("id")
+            if tray_id is None:
+                # Only the single-holder protocol has an unambiguous implicit ID.
+                if len(merged) > 1 or len(updates) > 1 or self._is_dual_nozzle:
+                    continue
+                tray_id = merged[0].get("id", 254) if merged else 254
+            match = next((tray for tray in merged if str(tray.get("id", 254)) == str(tray_id)), None)
+            if match is None:
+                match = {"id": tray_id}
+                merged.append(match)
+            match.update(update)
+        return merged
+
     def _process_message(self, payload: dict):
         """Process incoming MQTT message from printer."""
         # Handle top-level AMS data (comes outside of "print" key)
@@ -2330,13 +2358,19 @@ class BambuMQTTClient:
             if "vir_slot" in print_data:
                 vir_slot = print_data["vir_slot"]
                 if isinstance(vir_slot, list) and vir_slot:
+                    vir_slot = [dict(tray) for tray in vir_slot if isinstance(tray, dict)]
                     # Fix: single-nozzle printers (X1C, P1S, A1) report their single
                     # external slot with id=255 in vir_slot, but tray_now=254 when active.
                     # Remap id=255→254 for single-slot printers so active detection works.
                     # Dual-nozzle (H2D) has 2 slots: id=254 (Ext-L) and id=255 (Ext-R).
-                    if len(vir_slot) == 1 and str(vir_slot[0].get("id", "")) == "255":
+                    if (
+                        len(vir_slot) == 1
+                        and str(vir_slot[0].get("id", "")) == "255"
+                        and not self._is_dual_nozzle
+                        and len(self.state.raw_data.get("vt_tray") or []) <= 1
+                    ):
                         vir_slot[0]["id"] = "254"
-                    self.state.raw_data["vt_tray"] = vir_slot
+                    self.state.raw_data["vt_tray"] = self._merge_external_trays(vir_slot)
 
             # Handle vt_tray (virtual tray / external spool) data
             # Only use vt_tray if vir_slot is NOT in this message AND we don't already
@@ -2351,7 +2385,7 @@ class BambuMQTTClient:
                 else:
                     if isinstance(vt_tray, dict):
                         vt_tray = [vt_tray]
-                    self.state.raw_data["vt_tray"] = vt_tray
+                    self.state.raw_data["vt_tray"] = self._merge_external_trays(vt_tray)
 
             # The regular AMS change-hash (in _handle_ams_data) only sees AMS
             # units, and _handle_ams_data runs before this block — so a change

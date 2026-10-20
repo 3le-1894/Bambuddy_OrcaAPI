@@ -4004,6 +4004,41 @@ class TestVtTrayNormalization:
         )
         return client
 
+    def test_temperature_delta_keeps_external_spool_identity(self, mqtt_client):
+        original = {"id": "254", "tray_info_idx": "Pad34966", "tray_type": "PETG",
+                    "tray_color": "000000FF", "cali_idx": 922}
+        mqtt_client._process_message({"print": {"vt_tray": [original]}})
+        mqtt_client._process_message({"print": {"vt_tray": [{"nozzle_temp_min": "220"}]}})
+        stored = mqtt_client.state.raw_data["vt_tray"][0]
+        assert stored["tray_type"] == "PETG"
+        assert stored["tray_info_idx"] == "Pad34966"
+        assert stored["cali_idx"] == 922
+        assert stored["nozzle_temp_min"] == "220"
+        assert original == {"id": "254", "tray_info_idx": "Pad34966", "tray_type": "PETG",
+                            "tray_color": "000000FF", "cali_idx": 922}
+
+    def test_explicit_clear_still_clears_external_spool(self, mqtt_client):
+        mqtt_client._process_message({"print": {"vt_tray": [{"id": 254, "tray_type": "PETG"}]}})
+        mqtt_client._process_message({"print": {"vt_tray": [{"id": 254, "tray_type": ""}]}})
+        assert mqtt_client.state.raw_data["vt_tray"][0]["tray_type"] == ""
+        mqtt_client._process_message({"print": {"vt_tray": []}})
+        assert mqtt_client.state.raw_data["vt_tray"] == []
+
+    def test_dual_external_delta_updates_only_matching_id(self, mqtt_client):
+        mqtt_client._process_message({"print": {"vir_slot": [
+            {"id": 254, "tray_type": "PLA"}, {"id": 255, "tray_type": "PETG"}]}})
+        mqtt_client._process_message({"print": {"vir_slot": [{"id": 254, "nozzle_temp_min": "190"}]}})
+        trays = mqtt_client.state.raw_data["vt_tray"]
+        assert len(trays) == 2
+        assert trays[0]["tray_type"] == "PLA"
+        assert trays[1]["tray_type"] == "PETG"
+        mqtt_client._process_message({"print": {"vir_slot": [{"nozzle_temp_min": "200"}]}})
+        assert mqtt_client.state.raw_data["vt_tray"][0]["nozzle_temp_min"] == "190"
+        assert "nozzle_temp_min" not in mqtt_client.state.raw_data["vt_tray"][1]
+        mqtt_client._process_message({"print": {"vir_slot": [{"id": 255, "nozzle_temp_min": "230"}]}})
+        assert mqtt_client.state.raw_data["vt_tray"][1]["nozzle_temp_min"] == "230"
+        assert mqtt_client.state.raw_data["vt_tray"][0]["nozzle_temp_min"] == "190"
+
     def test_vt_tray_dict_normalized_in_update_state(self, mqtt_client):
         """Verify _update_state wraps a raw vt_tray dict into a list."""
         vt_dict = {

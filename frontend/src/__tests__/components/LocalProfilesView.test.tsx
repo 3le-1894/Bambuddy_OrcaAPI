@@ -131,6 +131,7 @@ describe('LocalProfilesView', () => {
   });
 
   beforeEach(() => {
+    vi.mocked(localStorage.getItem).mockReturnValue(null);
     server.use(
       http.get('/api/v1/local-presets/desktop-sync/status', () => HttpResponse.json({ synced_at: null, profile_count: 0, sidecar: { status: 'connected', version: '2.5.0-dev' } })),
       http.get('/api/v1/local-presets/', () => {
@@ -140,6 +141,52 @@ describe('LocalProfilesView', () => {
         return HttpResponse.json({ success: true });
       }),
     );
+  });
+
+  it('groups by compatibility metadata and repeats shared profiles without duplicate membership', async () => {
+    server.use(http.get('/api/v1/local-presets/', () => HttpResponse.json({
+      ...mockLocalPresets,
+      filament: [{ ...mockLocalPresets.filament[0], compatible_printers: '["Vulcan", "Heaphtus", "Vulcan"]' },
+        { ...mockLocalPresets.filament[1], compatible_printers: '{invalid}' }],
+    })));
+    render(<LocalProfilesView />);
+    await screen.findByText('Overture PLA Matte @BBL X1C');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Group by' }), { target: { value: 'printer' } });
+    expect(screen.getAllByText('Overture PLA Matte @BBL X1C')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Vulcan (1)' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Heaphtus (1)' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Unspecified (1)' })).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /H2D/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }));
+    expect(screen.queryByText('Overture PLA Matte @BBL X1C')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Expand all' }));
+    expect(screen.getAllByText('Overture PLA Matte @BBL X1C')).toHaveLength(2);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Group by' }), { target: { value: 'none' } });
+    expect(screen.getAllByText('Overture PLA Matte @BBL X1C')).toHaveLength(1);
+  });
+
+  it('groups material and brand, remembers the selection and reveals search matches', async () => {
+    render(<LocalProfilesView />);
+    await screen.findByText('Overture PLA Matte @BBL X1C');
+    const grouping = screen.getByRole('combobox', { name: 'Group by' });
+    fireEvent.change(grouping, { target: { value: 'material' } });
+    expect(screen.getByRole('button', { name: 'PLA (1)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'PETG (1)' })).toBeInTheDocument();
+    fireEvent.change(grouping, { target: { value: 'brand' } });
+    expect(screen.getByRole('button', { name: 'Overture (1)' })).toBeInTheDocument();
+    expect(localStorage.setItem).toHaveBeenCalledWith('localProfiles.groupBy', 'brand');
+    fireEvent.click(screen.getByRole('button', { name: 'Overture (1)' }));
+    expect(screen.queryByText('Overture PLA Matte @BBL X1C')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Overture' } });
+    expect(screen.getByText('Overture PLA Matte @BBL X1C')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Collapse all' })).toBeDisabled();
+  });
+
+  it('restores a saved grouping choice', async () => {
+    vi.mocked(localStorage.getItem).mockImplementation(key => key === 'localProfiles.groupBy' ? 'material' : null);
+    render(<LocalProfilesView />);
+    expect(await screen.findByRole('combobox', { name: 'Group by' })).toHaveValue('material');
+    expect(screen.getByRole('button', { name: 'PLA (1)' })).toBeInTheDocument();
   });
 
   it('renders filament and process columns', async () => {
