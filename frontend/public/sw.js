@@ -1,18 +1,18 @@
 // Bambuddy Service Worker
-const CACHE_NAME = 'bambuddy-v30';
-const STATIC_CACHE = 'bambuddy-static-v29';
+const CACHE_NAME = 'olympus-v31';
+const STATIC_CACHE = 'olympus-static-v30';
 
 // Static assets to cache on install
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
-  '/img/favicon.png',
-  '/img/favicon-16x16.png',
-  '/img/favicon-32x32.png',
-  '/img/android-chrome-192x192.png',
-  '/img/android-chrome-512x512.png',
-  '/img/apple-touch-icon.png',
-  '/img/bambuddy_logo_dark.png',
+  '/img/olympus-icon.svg',
+  '/img/olympus-16.png',
+  '/img/olympus-32.png',
+  '/img/olympus-192.png',
+  '/img/olympus-512.png',
+  '/img/olympus-180.png',
+  '/img/olympus-logo-dark.svg',
   // Self-hosted Inter font (#1460) - cached so the UI renders offline.
   '/fonts/inter-latin.woff2',
   '/fonts/inter-latin-ext.woff2',

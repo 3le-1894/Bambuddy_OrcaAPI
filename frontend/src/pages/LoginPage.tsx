@@ -712,8 +712,8 @@ export function LoginPage() {
         <div className="text-center">
           <div className="flex items-center justify-center mb-6">
             <img
-              src={mode === 'dark' ? '/img/bambuddy_logo_dark_transparent.png' : '/img/bambuddy_logo_light.png'}
-              alt="Bambuddy"
+              src={mode === 'dark' ? '/img/olympus-logo-dark.svg' : '/img/olympus-logo-light.svg'}
+              alt="Olympus"
               className="h-16"
             />
           </div>

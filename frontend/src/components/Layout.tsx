@@ -587,8 +587,8 @@ export function Layout() {
             <Menu className="w-6 h-6 text-white" />
           </button>
           <img
-            src={resolvedMode === 'dark' ? '/img/bambuddy_logo_dark_transparent.png' : '/img/bambuddy_logo_light.png'}
-            alt="Bambuddy"
+            src={resolvedMode === 'dark' ? '/img/olympus-logo-dark.svg' : '/img/olympus-logo-light.svg'}
+            alt="Olympus"
             className="h-8 ml-3"
           />
           {/* Bug report — the compact-layout home of the floating bubble. */}
@@ -624,9 +624,11 @@ export function Layout() {
         {/* Logo */}
         <div className={`border-b border-bambu-dark-tertiary flex items-center justify-center ${isSidebarCompact || sidebarExpanded ? 'p-4' : 'p-2'}`}>
           <img
-            src={resolvedMode === 'dark' ? '/img/bambuddy_logo_dark_transparent.png' : '/img/bambuddy_logo_light.png'}
-            alt="Bambuddy"
-            className={isSidebarCompact || sidebarExpanded ? 'h-16 w-auto' : 'h-8 w-8 object-cover object-left'}
+            src={isSidebarCompact || sidebarExpanded
+              ? (resolvedMode === 'dark' ? '/img/olympus-logo-dark.svg' : '/img/olympus-logo-light.svg')
+              : '/img/olympus-icon.svg'}
+            alt="Olympus"
+            className={isSidebarCompact || sidebarExpanded ? 'h-auto w-full max-w-[224px]' : 'h-10 w-10'}
           />
         </div>
 

@@ -82,7 +82,7 @@ export function UpdatedStreamOverlay(props: UpdatedStreamOverlayProps) {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <img src="/img/bambuddy_logo_powered_by.png" alt="Bambuddy" />
+          <img src="/img/olympus-logo-dark.svg" alt="Olympus" />
         </a>
       </header>
       {camera && (
