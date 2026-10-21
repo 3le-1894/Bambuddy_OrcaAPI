@@ -1,6 +1,6 @@
 // Bambuddy Service Worker
-const CACHE_NAME = 'olympus-v31';
-const STATIC_CACHE = 'olympus-static-v30';
+const CACHE_NAME = 'olympus-v32';
+const STATIC_CACHE = 'olympus-static-v31';
 
 // Static assets to cache on install
 const STATIC_ASSETS = [
