@@ -1,0 +1,20 @@
+# Sanitized example only: never applied automatically.
+# Use an available, compatible custom image; this tag is an example pin.
+# Preserve your existing image, environment and data when adapting this file.
+# Linux host networking exposes every app/Virtual Printer listener directly.
+# Configure application authentication before allowing access on host interfaces.
+# Local HTTP is on port 8000; Tailscale/HTTPS proxies are external, not set up here.
+# No published ports are needed or supported with host networking.
+# Never use `docker compose down -v` to apply a networking change.
+services:
+  bambuddy:
+    image: bambuddy-orcaapi:701a89a-arm64
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8000"
+    volumes:
+      # Example-only directories beside this file; replace with existing mounts.
+      - ./example-data:/app/data
+      - ./example-logs:/app/logs
